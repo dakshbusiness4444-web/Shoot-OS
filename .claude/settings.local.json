@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx -y @netlify/mcp@latest --site-id e3f43d5a-170a-49b5-b46b-8b352ec12877 --proxy-path \"https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..rwmLTCYaQMoDfUwl.irUwZQo8JAz21aceLibcY4iXCd0kGJ61jTNvGox5og2Qnd_LzQ2oWdBwdUbjGJ-8VIz0YPHt9VVzb_4RNNSYr_61LU45Tq7dh0IaaBzRluA8TQrqJOHF3IR7FrHoNnBR1nX1PH61GvtHUU-QodmGuaRTny4eGy66F2uGS4dxlWDUNNsjhpdPGmzBJff84NnGe-weKdQfx4uySOSuA8HeVoouqwEx52_KDJX8RyTCHApJfr2mqNL-hwg4YFaPyXqy_cpTGYngt2slDIs673887LqpqQ23181WZMnaFVKsQSCItJGb0UZiGctJ9Kk87inHX7wiccrlFhXiLzinzKVrDrfGZdErxBUsaoL_YvAsHJMoTMWsgA.nHGgevvyOwmtcEkgkFcivA\")",
+      "mcp__c799bea0-cf39-4308-972f-b07bf0d7dbf8__netlify-project-services-reader",
+      "mcp__c799bea0-cf39-4308-972f-b07bf0d7dbf8__netlify-project-services-updater",
+      "mcp__c799bea0-cf39-4308-972f-b07bf0d7dbf8__netlify-deploy-services-updater",
+      "Bash(npx -y @netlify/mcp@latest --site-id e3f43d5a-170a-49b5-b46b-8b352ec12877 --proxy-path \"https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..Z5P1gW35aCFcVCaN.dlsmnPOklV6wgAFx6s4gFQuuofo3Uu-cFQv3984_QmjIdSQmG9VeROxFLLsDSPDbKy_VyKvRMswnj8T0I82E4Jb5VxLsFbuJHi1EvX0BPhL8nGAx41vh_xUw6-MQXQ0mDXyOkZlPadEH4LuxtfJm_2AmtDlVmOt06FnHS7-ssOdcnfqEWbxBxfHqirnNqVMXFZVfRbuMf-0GieI5aU9-Uec4ykNHvMNl_QSlLIyl2KRMClQmQnYQ6-W760zjWIcx-xB1l2SYDnTVkI4NzNr0mW7UCnu8Wy5lB-6S8TrWkk47nfrZsofoKyCJfXO50DvbF2fsv3HU2Rf8kaKz5mqOs2gNj3FSvkfa8BKTNwROaX5xtR28Rw.GPyMgP9GI7OjbhPJ2RS6Zg\")",
+      "Bash(npx -y @netlify/mcp@latest --site-id e3f43d5a-170a-49b5-b46b-8b352ec12877 --proxy-path \"https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..-yMXJmYZx_uEKDQe.fJF_fGEgtZYG-g0p-V1epNfUGG-f6boyE1N8JDIUUA5gRq9tNa-yRWqmB0nb6ay5T4ZV908IzGVw_Zm_O1HF85gABymRvtJ3xf4E2Q_ywBO_n2mdWcGIGTZUoPvUd1Hj4OOU1mPHlZIBP49KoOGZdMzrgBwhMmWzfzwulyq3IcN8HHTk7jF08p4O-Q4OJU37QW56sEgwiJtMD2gnZyCR5RuJCSmrHLpyRFiZh26iaj-NgFl3iWY-L-74XW_fbdsrjDv8QBxnX9zXDGKTVN5cvanAheJHA5Pos1Y9jNUKCfk6oD5Gn0J6hQ6JYbFi0iWgT03FuMBUcHsj4nDqaPtdBEtwjGYm9KP6I1HRlUDQaZNevXCJtg.aHNE_zrgSTzxEVlk79qJjg\")"
+    ]
+  }
+}
