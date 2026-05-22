@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronRight, Plus, Trash2, ExternalLink, Shirt } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronRight, Plus, Trash2, Pencil, ExternalLink, Shirt, Palette, X } from 'lucide-react'
 import useStore from '../store/useStore'
 import {
   Card, Button, Modal, Input, Textarea, Select,
@@ -8,33 +8,159 @@ import {
 } from '../components/ui'
 import { CATEGORY_LABELS, PAIRING_TYPE_CONFIG } from '../data/seedData'
 
-// ─── Add Styling Pairing Modal ────────────────────────────────────────────────
-function AddPairingModal({ open, onClose, colorId, productId }) {
-  const { addStylingPairing, uploadImage } = useStore()
+// ─── Add Product Modal ────────────────────────────────────────────────────────
+function AddProductModal({ open, onClose }) {
+  const { addProduct } = useStore()
+  const [form, setForm] = useState({ name: '', category: 'other', description: '' })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    await addProduct({ name: form.name.trim(), category: form.category, description: form.description.trim() || null })
+    setForm({ name: '', category: 'other', description: '' })
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add Product">
+      <div className="space-y-4">
+        <Input
+          label="Product Name"
+          value={form.name}
+          onChange={(e) => set('name', e.target.value)}
+          placeholder="e.g. Linen Blazer"
+          autoFocus
+        />
+        <Select label="Category" value={form.category} onChange={(e) => set('category', e.target.value)}>
+          {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </Select>
+        <Textarea
+          label="Description (optional)"
+          value={form.description}
+          onChange={(e) => set('description', e.target.value)}
+          placeholder="Any notes about this product…"
+          rows={2}
+        />
+        <Button variant="primary" size="full" onClick={handleSubmit} disabled={saving || !form.name.trim()}>
+          {saving ? 'Adding…' : 'Add Product'}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Add Color Modal ──────────────────────────────────────────────────────────
+function AddColorModal({ open, onClose, productId }) {
+  const { addProductColor } = useStore()
+  const [form, setForm] = useState({ color_name: '', hex_code: '#D4C9B5' })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+
+  const handleSubmit = async () => {
+    if (!form.color_name.trim()) return
+    setSaving(true)
+    await addProductColor({ product_id: productId, color_name: form.color_name.trim(), hex_code: form.hex_code })
+    setForm({ color_name: '', hex_code: '#D4C9B5' })
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add Color">
+      <div className="space-y-4">
+        <Input
+          label="Color Name"
+          value={form.color_name}
+          onChange={(e) => set('color_name', e.target.value)}
+          placeholder="e.g. Dusty Rose, Olive, Black"
+          autoFocus
+        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-ink-400 uppercase tracking-wide">Hex Color</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={form.hex_code}
+              onChange={(e) => set('hex_code', e.target.value)}
+              className="w-12 h-12 rounded-xl border-0 bg-transparent cursor-pointer p-0"
+            />
+            <input
+              type="text"
+              value={form.hex_code}
+              onChange={(e) => set('hex_code', e.target.value)}
+              placeholder="#D4C9B5"
+              className="flex-1 bg-ivory-200 border-0 rounded-xl px-4 py-3 text-sm text-ink-900
+                placeholder-ink-200 focus:outline-none focus:ring-2 focus:ring-camel-300"
+            />
+          </div>
+          {/* Preview swatch */}
+          <div className="flex items-center gap-3 mt-1">
+            <div className="w-10 h-10 rounded-full border-2 border-ivory-300"
+              style={{ backgroundColor: form.hex_code }} />
+            <span className="text-sm text-ink-600">{form.color_name || 'Color preview'}</span>
+          </div>
+        </div>
+        <Button variant="primary" size="full" onClick={handleSubmit} disabled={saving || !form.color_name.trim()}>
+          {saving ? 'Adding…' : 'Add Color'}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Add / Edit Styling Pairing Modal ─────────────────────────────────────────
+function AddPairingModal({ open, onClose, colorId, productId, pairingToEdit = null }) {
+  const { addStylingPairing, updateStylingPairing, uploadImage } = useStore()
+  const isEditing = !!pairingToEdit
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
     type: 'shirt', description: '', image_url: '', notes: '',
   })
-  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+  const setField = (k, v) => setForm((p) => ({ ...p, [k]: v }))
+
+  // Reinit when opening in edit mode
+  useEffect(() => {
+    if (open && pairingToEdit) {
+      setForm({
+        type:        pairingToEdit.type        || 'shirt',
+        description: pairingToEdit.description || '',
+        image_url:   pairingToEdit.image_url   || '',
+        notes:       pairingToEdit.notes       || '',
+      })
+    } else if (open && !pairingToEdit) {
+      setForm({ type: 'shirt', description: '', image_url: '', notes: '' })
+    }
+  }, [open, pairingToEdit?.id])
 
   const handleImageUpload = async (file) => {
     setUploading(true)
-    try { const url = await uploadImage(file); set('image_url', url) }
+    try { const url = await uploadImage(file); setField('image_url', url) }
     catch (e) { console.error(e) }
     finally { setUploading(false) }
   }
 
   const handleSubmit = async () => {
     if (!form.description.trim() && !form.image_url) return
-    await addStylingPairing({ ...form, color_id: colorId, product_id: productId })
-    setForm({ type: 'shirt', description: '', image_url: '', notes: '' })
+    if (isEditing) {
+      await updateStylingPairing(pairingToEdit.id, {
+        type: form.type, description: form.description,
+        image_url: form.image_url, notes: form.notes,
+      })
+    } else {
+      await addStylingPairing({ ...form, color_id: colorId || null, product_id: productId })
+    }
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add to Style With">
+    <Modal open={open} onClose={onClose} title={isEditing ? 'Edit Style With' : 'Add to Style With'}>
       <div className="space-y-4">
-        <Select label="Type" value={form.type} onChange={(e) => set('type', e.target.value)}>
+        <Select label="Type" value={form.type} onChange={(e) => setField('type', e.target.value)}>
           {Object.entries(PAIRING_TYPE_CONFIG).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
           ))}
@@ -46,7 +172,7 @@ function AddPairingModal({ open, onClose, colorId, productId }) {
           form.type === 'note'  ? 'Styling note' :
           form.type === 'aesthetic' ? 'Aesthetic pairing' :
           'Description'
-        } value={form.description} onChange={(e) => set('description', e.target.value)}
+        } value={form.description} onChange={(e) => setField('description', e.target.value)}
           placeholder={
             form.type === 'shirt' ? 'e.g. White oversized button-down, worn open' :
             form.type === 'layer' ? 'e.g. Throw a linen blazer on top' :
@@ -54,13 +180,12 @@ function AddPairingModal({ open, onClose, colorId, productId }) {
             'Describe the pairing…'
           } rows={2} />
 
-        {/* Optional image */}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-ink-400 uppercase tracking-wide">Reference Image (optional)</label>
           {form.image_url ? (
             <div className="relative">
               <img src={form.image_url} alt="" className="w-full aspect-[4/5] object-cover rounded-xl" />
-              <button onClick={() => set('image_url', '')}
+              <button onClick={() => setField('image_url', '')}
                 className="absolute top-2 right-2 w-7 h-7 bg-ink-900/60 text-white rounded-full flex items-center justify-center">
                 <Trash2 size={11} />
               </button>
@@ -75,19 +200,22 @@ function AddPairingModal({ open, onClose, colorId, productId }) {
           )}
         </div>
 
-        <Textarea label="Notes" value={form.notes} onChange={(e) => set('notes', e.target.value)}
+        <Textarea label="Notes" value={form.notes} onChange={(e) => setField('notes', e.target.value)}
           placeholder="Shoot day detail…" rows={2} />
 
-        <Button variant="primary" size="full" onClick={handleSubmit}>Add</Button>
+        <Button variant="primary" size="full" onClick={handleSubmit}>
+          {isEditing ? 'Save Changes' : 'Add'}
+        </Button>
       </div>
     </Modal>
   )
 }
 
-// ─── Style With tab content ───────────────────────────────────────────────────
+// ─── Style With tab ───────────────────────────────────────────────────────────
 function StyleWithTab({ product, selectedColor }) {
   const { stylingPairings, deleteStylingPairing } = useStore()
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpen,      setAddOpen]      = useState(false)
+  const [editPairing,  setEditPairing]  = useState(null)  // pairing being edited
 
   const pairings = stylingPairings.filter(
     (p) => p.product_id === product.id && (!selectedColor || p.color_id === selectedColor.id)
@@ -101,8 +229,7 @@ function StyleWithTab({ product, selectedColor }) {
 
   return (
     <div className="space-y-5">
-      {/* Color context */}
-      {selectedColor && (
+      {selectedColor ? (
         <div className="flex items-center gap-3 px-1">
           <div className="w-8 h-8 rounded-full border-2 border-ink-200"
             style={{ backgroundColor: selectedColor.hex_code }} />
@@ -114,9 +241,7 @@ function StyleWithTab({ product, selectedColor }) {
             <Plus size={13} /> Add
           </Button>
         </div>
-      )}
-
-      {!selectedColor && (
+      ) : (
         <div className="flex items-center justify-between">
           <p className="text-sm text-ink-500">Select a color above to filter by colorway</p>
           <Button variant="ghost" size="sm" onClick={() => setAddOpen(true)}>
@@ -139,7 +264,6 @@ function StyleWithTab({ product, selectedColor }) {
                 </span>
               </div>
 
-              {/* Visual grid for items with images, list for text-only */}
               {items.some((i) => i.image_url) ? (
                 <div className="grid grid-cols-2 gap-3">
                   {items.map((item) => (
@@ -155,10 +279,16 @@ function StyleWithTab({ product, selectedColor }) {
                       }
                       <div className="flex items-center justify-between px-0.5">
                         {!item.image_url && <CreatorTag creator={item.creator} />}
-                        <button onClick={() => deleteStylingPairing(item.id)}
-                          className="p-1 text-ink-300 active:text-earth-400 ml-auto">
-                          <Trash2 size={12} />
-                        </button>
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button onClick={() => setEditPairing(item)}
+                            className="p-1 text-ink-300 active:text-camel-500">
+                            <Pencil size={11} />
+                          </button>
+                          <button onClick={() => deleteStylingPairing(item.id)}
+                            className="p-1 text-ink-300 active:text-earth-400">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -173,10 +303,16 @@ function StyleWithTab({ product, selectedColor }) {
                           {item.notes && <p className="text-xs text-ink-500 mt-1">{item.notes}</p>}
                           <div className="mt-2"><CreatorTag creator={item.creator} /></div>
                         </div>
-                        <button onClick={() => deleteStylingPairing(item.id)}
-                          className="p-1.5 text-ink-300 active:text-earth-400 flex-shrink-0">
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button onClick={() => setEditPairing(item)}
+                            className="p-1.5 text-ink-300 active:text-camel-500">
+                            <Pencil size={13} />
+                          </button>
+                          <button onClick={() => deleteStylingPairing(item.id)}
+                            className="p-1.5 text-ink-300 active:text-earth-400">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     </Card>
                   ))}
@@ -193,18 +329,28 @@ function StyleWithTab({ product, selectedColor }) {
         colorId={selectedColor?.id}
         productId={product.id}
       />
+      <AddPairingModal
+        open={!!editPairing}
+        onClose={() => setEditPairing(null)}
+        colorId={selectedColor?.id}
+        productId={product.id}
+        pairingToEdit={editPairing}
+      />
     </div>
   )
 }
 
-// ─── Product detail view ──────────────────────────────────────────────────────
-function ProductDetail({ product }) {
-  const { productColors, shots, references, matchingShirts, stylingPairings } = useStore()
+// ─── Product detail ───────────────────────────────────────────────────────────
+function ProductDetail({ product, onBack }) {
+  const { productColors, shots, references, stylingPairings, deleteProductColor, deleteProduct } = useStore()
   const [selectedColorId, setSelectedColorId] = useState(null)
   const [activeTab,        setActiveTab]        = useState('style')
+  const [addColorOpen,     setAddColorOpen]      = useState(false)
+  const [manageColors,     setManageColors]      = useState(false)
+  const [confirmDelete,    setConfirmDelete]      = useState(false)
 
   const colors        = productColors.filter((c) => c.product_id === product.id)
-  const selectedColor = colors.find((c) => c.id === selectedColorId) || colors[0]
+  const selectedColor = colors.find((c) => c.id === selectedColorId) || colors[0] || null
 
   const productShots = shots.filter(
     (s) => s.product_id === product.id &&
@@ -222,10 +368,15 @@ function ProductDetail({ product }) {
 
   return (
     <div className="space-y-4">
+      <button onClick={onBack}
+        className="flex items-center gap-1.5 text-sm text-ink-500 active:text-ink-900">
+        <ChevronRight size={14} className="rotate-180" /> All Products
+      </button>
+
       {/* Product hero card */}
       <Card className="p-4">
         <span className="text-[10px] tracking-[0.2em] uppercase text-ink-400 font-medium">
-          {CATEGORY_LABELS[product.category]}
+          {CATEGORY_LABELS[product.category] || product.category}
         </span>
         <h2 className="font-display text-2xl font-medium text-ink-900 mt-0.5 mb-1">
           {product.name}
@@ -234,34 +385,65 @@ function ProductDetail({ product }) {
           <p className="text-sm text-ink-500 mb-4">{product.description}</p>
         )}
 
-        {/* Color swatches */}
-        {colors.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-ink-400 mb-3">Colorways</p>
-            <div className="flex gap-5 flex-wrap">
-              {colors.map((c) => (
-                <ColorSwatch
-                  key={c.id}
-                  hex={c.hex_code}
-                  name={c.color_name}
-                  selected={selectedColor?.id === c.id}
-                  onClick={() => setSelectedColorId(c.id)}
-                />
-              ))}
+        {/* Color swatches + Add Color */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] uppercase tracking-widest text-ink-400">Colorways</p>
+            <div className="flex items-center gap-3">
+              {colors.length > 0 && (
+                <button
+                  onClick={() => setManageColors((v) => !v)}
+                  className={`text-xs font-medium transition-colors ${manageColors ? 'text-rose-400' : 'text-ink-400'}`}
+                >
+                  {manageColors ? 'Done' : 'Manage'}
+                </button>
+              )}
+              <button
+                onClick={() => setAddColorOpen(true)}
+                className="flex items-center gap-1 text-xs font-medium text-camel-500 active:text-camel-600"
+              >
+                <Plus size={12} /> Add Color
+              </button>
             </div>
           </div>
-        )}
+          {colors.length > 0 ? (
+            <div className="flex gap-5 flex-wrap">
+              {colors.map((c) => (
+                <div key={c.id} className="relative">
+                  <ColorSwatch
+                    hex={c.hex_code}
+                    name={c.color_name}
+                    selected={!manageColors && selectedColor?.id === c.id}
+                    onClick={() => !manageColors && setSelectedColorId(c.id)}
+                  />
+                  {manageColors && (
+                    <button
+                      onClick={() => {
+                        deleteProductColor(c.id)
+                        if (selectedColorId === c.id) setSelectedColorId(null)
+                      }}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-rose-400 text-white rounded-full
+                        flex items-center justify-center shadow-sm animate-fade-in"
+                    >
+                      <X size={10} strokeWidth={3} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-ink-300 italic">No colors yet — add one above</p>
+          )}
+        </div>
       </Card>
 
-      {/* Color identity card */}
+      {/* Selected color identity */}
       {selectedColor && (
         <div className="flex items-center gap-4 px-1">
           <div className="w-14 h-14 rounded-2xl border border-ivory-200 shadow-sm flex-shrink-0"
             style={{ backgroundColor: selectedColor.hex_code }} />
           <div>
-            <p className="font-display text-lg font-medium text-ink-900">
-              {product.name}
-            </p>
+            <p className="font-display text-lg font-medium text-ink-900">{product.name}</p>
             <p className="text-sm text-ink-500">{selectedColor.color_name}</p>
             <p className="text-xs text-ink-300 mt-0.5">{selectedColor.hex_code}</p>
           </div>
@@ -279,12 +461,10 @@ function ProductDetail({ product }) {
         ))}
       </div>
 
-      {/* ── Style With tab ── */}
       {activeTab === 'style' && (
         <StyleWithTab product={product} selectedColor={selectedColor} />
       )}
 
-      {/* ── Overview tab ── */}
       {activeTab === 'overview' && (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3 text-center">
@@ -306,35 +486,48 @@ function ProductDetail({ product }) {
         </div>
       )}
 
-      {/* ── Shots tab ── */}
       {activeTab === 'shots' && (
         <div className="space-y-2">
           {productShots.length === 0 ? (
             <EmptyState icon={ChevronRight} title="No shots yet" subtitle="Add shots in Planning Mode" />
           ) : (
-            productShots.map((s) => (
-              <Card key={s.id} className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium text-ink-900">{s.title}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0
-                    ${s.status === 'done' ? 'bg-moss-100 text-moss-500' : 'bg-ivory-200 text-ink-600'}`}>
-                    {s.status}
-                  </span>
-                </div>
-                {s.description && <p className="text-xs text-ink-500 mt-1">{s.description}</p>}
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[10px] text-ink-400">
-                    {s.media_type === 'video' ? '🎬 Video' : '📷 Photo'}
-                  </span>
-                  <CreatorTag creator={s.creator} />
-                </div>
-              </Card>
-            ))
+            productShots.map((s) => {
+              const shotColor = productColors.find((c) => c.id === s.color_id)
+              return (
+                <Card key={s.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-ink-900">{s.title}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0
+                      ${s.status === 'done' ? 'bg-moss-100 text-moss-500' : 'bg-ivory-200 text-ink-600'}`}>
+                      {s.status}
+                    </span>
+                  </div>
+                  {s.description && <p className="text-xs text-ink-500 mt-1">{s.description}</p>}
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {shotColor ? (
+                      <span className="flex items-center gap-1 text-[10px] font-medium text-ink-600
+                        bg-ivory-200 px-2 py-0.5 rounded-full">
+                        <span className="w-2.5 h-2.5 rounded-full border border-ink-100/60 flex-shrink-0"
+                          style={{ backgroundColor: shotColor.hex_code }} />
+                        {shotColor.color_name}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 bg-camel-100 text-camel-500 rounded-full">
+                        All Colors
+                      </span>
+                    )}
+                    <span className="text-[10px] text-ink-400">
+                      {s.media_type === 'video' ? '🎬 Video' : '📷 Photo'}
+                    </span>
+                    <CreatorTag creator={s.creator} />
+                  </div>
+                </Card>
+              )
+            })
           )}
         </div>
       )}
 
-      {/* ── Refs tab ── */}
       {activeTab === 'refs' && (
         <div className="space-y-2">
           {productRefs.length === 0 ? (
@@ -363,6 +556,45 @@ function ProductDetail({ product }) {
           )}
         </div>
       )}
+
+      {/* Remove Product */}
+      <div className="pt-2 pb-4">
+        {!confirmDelete ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-full py-3 rounded-xl text-sm font-medium text-rose-400 bg-rose-50
+              active:bg-rose-100 transition-colors border border-rose-100"
+          >
+            Remove Product
+          </button>
+        ) : (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 space-y-3 animate-fade-in">
+            <p className="text-sm text-rose-600 text-center font-medium">
+              Remove "{product.name}"? This also deletes all its colors.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-ivory-200 text-ink-700 active:bg-ivory-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { deleteProduct(product.id); onBack() }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-rose-400 text-white active:bg-rose-500"
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AddColorModal
+        open={addColorOpen}
+        onClose={() => setAddColorOpen(false)}
+        productId={product.id}
+      />
     </div>
   )
 }
@@ -372,37 +604,47 @@ export default function ProductPages() {
   const { products, productColors, shots } = useStore()
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [categoryFilter,  setCategoryFilter]  = useState('all')
+  const [addProductOpen,  setAddProductOpen]  = useState(false)
 
   const categories = ['all', ...new Set(products.map((p) => p.category))]
   const filtered   = categoryFilter === 'all' ? products : products.filter((p) => p.category === categoryFilter)
 
-  if (selectedProduct) {
+  // Keep selectedProduct in sync if products list updates (e.g. after adding new product)
+  const currentProduct = selectedProduct
+    ? products.find((p) => p.id === selectedProduct.id) || selectedProduct
+    : null
+
+  if (currentProduct) {
     return (
-      <div className="space-y-4">
-        <button onClick={() => setSelectedProduct(null)}
-          className="flex items-center gap-1.5 text-sm text-ink-500 active:text-ink-900">
-          <ChevronRight size={14} className="rotate-180" /> All Products
-        </button>
-        <ProductDetail product={selectedProduct} />
+      <div className="page-container animate-page-enter">
+        <ProductDetail
+          product={currentProduct}
+          onBack={() => setSelectedProduct(null)}
+        />
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-2xl font-medium text-ink-900">Products</h1>
-        <p className="text-sm text-ink-400 mt-1">{products.length} items in this shoot</p>
+    <div className="page-container animate-page-enter">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h1 className="font-display text-2xl font-medium text-ink-900">Products</h1>
+          <p className="text-sm text-ink-400 mt-0.5">{products.length} items in this shoot</p>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => setAddProductOpen(true)}>
+          <Plus size={14} /> Add Product
+        </Button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mt-3">
         {categories.map((cat) => (
           <FilterChip key={cat} label={cat === 'all' ? 'All' : CATEGORY_LABELS[cat] || cat}
             active={categoryFilter === cat} onClick={() => setCategoryFilter(cat)} />
         ))}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 mt-3">
         {filtered.map((prod) => {
           const colors    = productColors.filter((c) => c.product_id === prod.id)
           const shotCount = shots.filter((s) => s.product_id === prod.id).length
@@ -415,28 +657,26 @@ export default function ProductPages() {
                 <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-ivory-200">
                   {colors.length > 0 ? (
                     <div className="w-full h-full flex">
-                      {colors.slice(0, 4).map((c, i) => (
+                      {colors.slice(0, 4).map((c) => (
                         <div key={c.id} className="flex-1 h-full" style={{ backgroundColor: c.hex_code }} />
                       ))}
                     </div>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="font-display text-base text-camel-400">{prod.name[0]}</span>
+                      <Palette size={16} className="text-ink-300" />
                     </div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink-900">{prod.name}</p>
-                  <p className="text-xs text-ink-400">{CATEGORY_LABELS[prod.category]}</p>
+                  <p className="text-xs text-ink-400">{CATEGORY_LABELS[prod.category] || prod.category}</p>
                   <div className="flex items-center gap-3 mt-1.5">
                     {colors.length > 0 && (
-                      <span className="text-xs text-ink-400">{colors.length} colors</span>
+                      <span className="text-xs text-ink-400">{colors.length} color{colors.length !== 1 ? 's' : ''}</span>
                     )}
                     {shotCount > 0 && (
-                      <span className="text-xs text-ink-400">
-                        {doneCount}/{shotCount} shots
-                      </span>
+                      <span className="text-xs text-ink-400">{doneCount}/{shotCount} shots</span>
                     )}
                   </div>
                 </div>
@@ -445,7 +685,13 @@ export default function ProductPages() {
             </button>
           )
         })}
+
+        {filtered.length === 0 && (
+          <EmptyState icon={Palette} title="No products yet" subtitle="Tap Add Product to get started" />
+        )}
       </div>
+
+      <AddProductModal open={addProductOpen} onClose={() => setAddProductOpen(false)} />
     </div>
   )
 }

@@ -173,6 +173,6 @@ export const USERS = {
 }
 
 export const CREATOR_CONFIG = {
-  maam:  { label: "Ma'am", color: 'bg-camel-100 text-camel-500' },
-  daksh: { label: 'Daksh', color: 'bg-earth-300 text-white'     },
+  maam:  { label: "Ma'am", color: 'bg-camel-100 text-camel-500'   },
+  daksh: { label: 'Daksh', color: 'bg-earth-300/25 text-earth-500' },
 }

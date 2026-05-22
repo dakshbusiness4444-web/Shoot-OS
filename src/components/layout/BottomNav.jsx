@@ -1,76 +1,62 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Layout, Camera, Package, MoreHorizontal } from 'lucide-react'
-import useStore from '../../store/useStore'
+import { LayoutDashboard, CalendarDays, Plus, BarChart2, UserCircle } from 'lucide-react'
+import CreateModal from '../ui/CreateModal'
 
-const NAV_ITEMS = [
-  { path: '/home',     icon: Home,          label: 'Home'     },
-  { path: '/plan',     icon: Layout,        label: 'Plan'     },
-  { path: '/shoot',    icon: Camera,        label: 'Shoot',   primary: true },
-  { path: '/products', icon: Package,       label: 'Products' },
-  { path: '/references', icon: MoreHorizontal, label: 'More'  },
+const NAV = [
+  { path: '/home',      icon: LayoutDashboard, label: 'Home'      },
+  { path: '/content',   icon: CalendarDays,    label: 'Content'   },
+  { path: '__create',   icon: Plus,            label: 'Create',   isCreate: true },
+  { path: '/analytics', icon: BarChart2,       label: 'Analytics' },
+  { path: '/account',   icon: UserCircle,      label: 'Account'   },
 ]
 
 export default function BottomNav() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const shots     = useStore((s) => s.shots)
-
-  const pendingCount = shots.filter(
-    (s) => s.shot_type === 'product' && s.status !== 'done'
-  ).length
-
-  const isMoreActive = ['/references', '/bts', '/extra'].includes(location.pathname)
+  const navigate     = useNavigate()
+  const location     = useLocation()
+  const [open, setOpen] = useState(false)
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-ivory-50/95 backdrop-blur-md border-t border-ivory-200">
-      <div className="max-w-lg mx-auto px-2 flex items-center justify-around pb-safe">
-        {NAV_ITEMS.map(({ path, icon: Icon, label, primary }) => {
-          const isMore   = label === 'More'
-          const isActive = isMore
-            ? isMoreActive
-            : location.pathname === path || location.pathname.startsWith(path + '/')
+    <>
+      <div className="fixed bottom-0 left-0 right-0 z-30 flex justify-center px-4"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <nav className="w-full max-w-sm bg-white border border-ivory-200 rounded-2xl shadow-lifted
+          flex items-center px-1 py-1 gap-0.5">
+          {NAV.map(({ path, icon: Icon, label, isCreate }) => {
+            const isActive = !isCreate && (
+              location.pathname === path || location.pathname.startsWith(path + '/')
+            )
 
-          if (primary) {
-            return (
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className="flex flex-col items-center gap-0.5 py-2 px-3"
-              >
-                <div className="relative">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors
-                    ${isActive ? 'bg-ink-900 text-ivory-100' : 'bg-ivory-200 text-ink-600'}`}>
-                    <Icon size={20} />
+            if (isCreate) {
+              return (
+                <button key="create" onClick={() => setOpen(true)}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1">
+                  <div className="w-11 h-11 rounded-xl bg-camel-500 flex items-center justify-center
+                    shadow-lifted active:bg-camel-600 transition-colors">
+                    <Plus size={22} className="text-white" strokeWidth={2.5} />
                   </div>
-                  {pendingCount > 0 && !isActive && (
-                    <span className="nav-badge">{pendingCount > 99 ? '99+' : pendingCount}</span>
-                  )}
-                </div>
-                <span className={`text-[10px] font-medium ${isActive ? 'text-ink-900' : 'text-ink-400'}`}>
+                  <span className="text-[10px] font-semibold text-camel-500">Create</span>
+                </button>
+              )
+            }
+
+            return (
+              <button key={path} onClick={() => navigate(path)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 px-1
+                  rounded-xl transition-all active:bg-ivory-100 ${isActive ? 'bg-camel-50' : ''}`}>
+                <Icon size={20}
+                  className={isActive ? 'text-camel-500' : 'text-ink-400'}
+                  strokeWidth={isActive ? 2.5 : 1.75} />
+                <span className={`text-[10px] font-semibold ${isActive ? 'text-camel-500' : 'text-ink-400'}`}>
                   {label}
                 </span>
               </button>
             )
-          }
-
-          return (
-            <button
-              key={path}
-              onClick={() => navigate(isMore ? '/references' : path)}
-              className="flex flex-col items-center gap-0.5 py-3 px-3"
-            >
-              <Icon
-                size={20}
-                className={`transition-colors ${isActive ? 'text-ink-900' : 'text-ink-400'}`}
-                strokeWidth={isActive ? 2 : 1.5}
-              />
-              <span className={`text-[10px] font-medium ${isActive ? 'text-ink-900' : 'text-ink-400'}`}>
-                {label}
-              </span>
-            </button>
-          )
-        })}
+          })}
+        </nav>
       </div>
-    </nav>
+
+      <CreateModal open={open} onClose={() => setOpen(false)} />
+    </>
   )
 }

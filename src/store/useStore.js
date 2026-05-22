@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { SEED_PROJECT, SEED_PRODUCTS, SEED_COLORS, USERS } from '../data/seedData'
+import { SEED_PROJECT, SEED_PRODUCTS, SEED_COLORS } from '../data/seedData'
+import { fetchIgProfile, fetchIgMedia } from '../lib/instagram'
 
-const LOCAL_USER_KEY  = 'shootos_user'
-const LOCAL_DATA_KEY  = 'shootos_data_v2'   // v2 forces re-seed with new product names
+const LOCAL_DATA_KEY  = 'brandropos_data_v1'
 
 function getLocalData() {
   try {
@@ -26,6 +26,8 @@ function buildInitialLocalData() {
     btsIdeas:        [],
     matchingShirts:  [],
     stylingPairings: [],
+    contentItems:    [],
+    campaigns:       [],
   }
 }
 
@@ -35,9 +37,16 @@ function uid() {
 
 const useStore = create((set, get) => ({
   // --- Auth ---
-  currentUser: null,
-  isLoading:   true,
-  error:       null,
+  currentUser:  null,   // Supabase auth user object
+  userProfile:  null,   // profiles row { username, workspace_name }
+  isLoading:    true,
+  authLoading:  false,
+  error:        null,
+
+  // --- Instagram ---
+  instagramAccount: null,   // row from instagram_accounts table
+  igMedia:          [],     // recent posts from IG API
+  igLoading:        false,
 
   // --- Data ---
   projects:        [],
@@ -49,16 +58,16 @@ const useStore = create((set, get) => ({
   btsIdeas:        [],
   matchingShirts:  [],
   stylingPairings: [],
+  contentItems:    [],
+  campaigns:       [],
 
   // --- Init ---
-  init() {
-    const storedUser = localStorage.getItem(LOCAL_USER_KEY)
-    const user = storedUser ? JSON.parse(storedUser) : null
-
+  async init() {
     if (!isSupabaseConfigured) {
       const local = getLocalData() || buildInitialLocalData()
       set({
-        currentUser:     user,
+        currentUser:     { id: 'dev', email: 'dev@local' },
+        userProfile:     { username: 'dev', workspace_name: 'Dev Workspace' },
         isLoading:       false,
         projects:        local.projects        || [SEED_PROJECT],
         activeProjectId: local.projects?.[0]?.id || null,
@@ -73,43 +82,72 @@ const useStore = create((set, get) => ({
       return
     }
 
-    set({ currentUser: user, isLoading: true })
-    get().loadFromSupabase()
+    // Check existing session
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      set({ currentUser: session.user, isLoading: true })
+      await get().loadUserProfile()
+      await get().loadFromSupabase()
+    } else {
+      set({ isLoading: false, currentUser: null })
+    }
+
+    // Listen for auth state changes
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        set({ currentUser: session.user, isLoading: true })
+        await get().loadUserProfile()
+        await get().loadFromSupabase()
+      } else if (event === 'SIGNED_OUT') {
+        set({
+          currentUser: null, userProfile: null,
+          projects: [], products: [], productColors: [],
+          shots: [], references: [], btsIdeas: [],
+          matchingShirts: [], stylingPairings: [],
+          activeProjectId: null, isLoading: false,
+        })
+      }
+    })
   },
 
   async loadFromSupabase() {
     try {
-      const [
-        { data: projects },
-        { data: products },
-        { data: productColors },
-        { data: shots },
-        { data: references },
-        { data: btsIdeas },
-        { data: matchingShirts },
-        { data: stylingPairings },
-      ] = await Promise.all([
-        supabase.from('projects').select('*').order('created_at'),
-        supabase.from('products').select('*').order('priority').order('created_at'),
-        supabase.from('product_colors').select('*').order('created_at'),
-        supabase.from('shots').select('*').order('shot_number').order('created_at'),
-        supabase.from('shot_references').select('*').order('created_at'),
-        supabase.from('bts_ideas').select('*').order('created_at'),
-        supabase.from('matching_shirts').select('*').order('created_at'),
-        supabase.from('styling_pairings').select('*').order('created_at'),
-      ])
+      const safe = async (query) => {
+        const { data, error } = await query
+        if (error) console.error('Supabase query error:', error.message)
+        return data || []
+      }
+
+      const [projects, products, productColors, shots, references, btsIdeas, matchingShirts, stylingPairings, contentItems, campaigns] =
+        await Promise.all([
+          safe(supabase.from('projects').select('*').order('created_at')),
+          safe(supabase.from('products').select('*').order('priority').order('created_at')),
+          safe(supabase.from('product_colors').select('*').order('created_at')),
+          safe(supabase.from('shots').select('*').order('shot_number').order('created_at')),
+          safe(supabase.from('shot_references').select('*').order('created_at')),
+          safe(supabase.from('bts_ideas').select('*').order('created_at')),
+          safe(supabase.from('matching_shirts').select('*').order('created_at')),
+          safe(supabase.from('styling_pairings').select('*').order('created_at')),
+          safe(supabase.from('content_items').select('*').order('created_at', { ascending: false })),
+          safe(supabase.from('campaigns').select('*').order('created_at', { ascending: false })),
+        ])
+
       set({
         isLoading:       false,
-        projects:        projects        || [],
-        activeProjectId: (projects || [])[0]?.id || null,
-        products:        products        || [],
-        productColors:   productColors   || [],
-        shots:           shots           || [],
-        references:      references      || [],
-        btsIdeas:        btsIdeas        || [],
-        matchingShirts:  matchingShirts  || [],
-        stylingPairings: stylingPairings || [],
+        projects,
+        activeProjectId: projects[0]?.id || null,
+        products,
+        productColors,
+        shots,
+        references,
+        btsIdeas,
+        matchingShirts,
+        stylingPairings,
+        contentItems,
+        campaigns,
       })
+      // Load Instagram account in background
+      get().loadInstagramAccount()
     } catch (err) {
       set({ isLoading: false, error: err.message })
     }
@@ -130,15 +168,130 @@ const useStore = create((set, get) => ({
   },
 
   // --- Auth ---
-  loginAs(userKey) {
-    const user = USERS[userKey]
-    if (!user) return
-    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(user))
-    set({ currentUser: user })
+  async signUp({ email, username, password, workspaceName }) {
+    set({ authLoading: true, error: null })
+    try {
+      // Check username availability first
+      const { data: existing } = await supabase
+        .from('profiles').select('id').eq('username', username).maybeSingle()
+      if (existing) throw new Error('Username already taken')
+
+      // Pass username + workspace as metadata — the DB trigger creates profile & project
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: 'https://indirookh-shoot-os.vercel.app',
+          data: {
+            username,
+            workspace_name: workspaceName || username,
+          },
+        },
+      })
+      if (error) throw error
+
+      set({ authLoading: false })
+      // Return whether we got an immediate session (email confirm disabled)
+      // or need to wait for email verification
+      return { needsEmailConfirm: !data.session }
+    } catch (err) {
+      set({ authLoading: false, error: err.message })
+      throw err
+    }
   },
-  logout() {
-    localStorage.removeItem(LOCAL_USER_KEY)
-    set({ currentUser: null })
+
+  async signIn({ emailOrUsername, password }) {
+    set({ authLoading: true, error: null })
+    try {
+      let email = emailOrUsername.trim()
+      if (!email.includes('@')) {
+        // Username login — look up email via DB function
+        const { data, error } = await supabase.rpc('get_email_by_username', { p_username: email })
+        if (error || !data) throw new Error('Username not found')
+        email = data
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      set({ authLoading: false })
+    } catch (err) {
+      set({ authLoading: false, error: err.message })
+      throw err
+    }
+  },
+
+  async signOut() {
+    await supabase.auth.signOut()
+    localStorage.removeItem(LOCAL_DATA_KEY)
+  },
+
+  async loadUserProfile() {
+    const { data } = await supabase.from('profiles').select('*').maybeSingle()
+    if (data) set({ userProfile: data })
+  },
+
+  // ── Instagram ──────────────────────────────────────────────────────────
+
+  async loadInstagramAccount() {
+    if (!isSupabaseConfigured) return null
+    const { data } = await supabase.from('instagram_accounts').select('*').maybeSingle()
+    set({ instagramAccount: data || null })
+    return data
+  },
+
+  async disconnectInstagram() {
+    const { currentUser } = get()
+    if (!currentUser || !isSupabaseConfigured) return
+    await supabase.from('instagram_accounts').delete().eq('user_id', currentUser.id)
+    set({ instagramAccount: null, igMedia: [] })
+  },
+
+  async syncInstagramData() {
+    const { instagramAccount } = get()
+    if (!instagramAccount?.access_token) return
+    set({ igLoading: true })
+    try {
+      const [profile, mediaData] = await Promise.all([
+        fetchIgProfile(instagramAccount.access_token),
+        fetchIgMedia(instagramAccount.access_token),
+      ])
+      if (isSupabaseConfigured) {
+        await supabase.from('instagram_accounts').update({
+          followers_count: profile.followers_count ?? instagramAccount.followers_count,
+          media_count:     profile.media_count     ?? instagramAccount.media_count,
+          last_synced_at:  new Date().toISOString(),
+        }).eq('user_id', instagramAccount.user_id)
+      }
+      set({
+        instagramAccount: { ...instagramAccount, ...profile },
+        igMedia:          mediaData.data || [],
+        igLoading:        false,
+      })
+    } catch (err) {
+      console.error('syncInstagramData:', err)
+      set({ igLoading: false })
+    }
+  },
+
+  async updateUserProfile({ workspaceName, username, avatarUrl }) {
+    const { currentUser } = get()
+    if (!currentUser) throw new Error('Not logged in')
+    const updates = { updated_at: new Date().toISOString() }
+    if (workspaceName !== undefined) updates.workspace_name = workspaceName
+    if (username      !== undefined) updates.username       = username
+    if (avatarUrl     !== undefined) updates.avatar_url     = avatarUrl
+    const { error } = await supabase.from('profiles').update(updates).eq('id', currentUser.id)
+    if (error) throw error
+    set((s) => ({ userProfile: { ...s.userProfile, ...updates } }))
+  },
+
+  async uploadAvatar(file) {
+    if (!isSupabaseConfigured) return URL.createObjectURL(file)
+    const ext  = file.name.split('.').pop()
+    const path = `avatars/${uid()}.${ext}`
+    const { error } = await supabase.storage.from('shoot-media').upload(path, file, { upsert: true })
+    if (error) throw error
+    const { data } = supabase.storage.from('shoot-media').getPublicUrl(path)
+    return data.publicUrl
   },
 
   // --- Local persistence ---
@@ -154,13 +307,19 @@ const useStore = create((set, get) => ({
       btsIdeas:        s.btsIdeas,
       matchingShirts:  s.matchingShirts,
       stylingPairings: s.stylingPairings,
+      contentItems:    s.contentItems,
+      campaigns:       s.campaigns,
     })
   },
 
   // --- Shots ---
   async addShot(shotData) {
     const { currentUser, activeProjectId, shots } = get()
-    const newShot = {
+    // Sanitize: convert empty strings to null for FK and optional fields
+    const sanitize = (obj) => Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [k, v === '' ? null : v])
+    )
+    const newShot = sanitize({
       id:           uid(),
       project_id:   activeProjectId,
       product_id:   null,
@@ -174,7 +333,7 @@ const useStore = create((set, get) => ({
       created_at:   new Date().toISOString(),
       updated_at:   new Date().toISOString(),
       ...shotData,
-    }
+    })
     set((state) => ({ shots: [...state.shots, newShot] }))
     get()._saveLocal()
     if (isSupabaseConfigured) {
@@ -206,7 +365,10 @@ const useStore = create((set, get) => ({
   // --- References ---
   async addReference(refData) {
     const { currentUser, activeProjectId } = get()
-    const newRef = {
+    const sanitize = (obj) => Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [k, v === '' ? null : v])
+    )
+    const newRef = sanitize({
       id:         uid(),
       project_id: activeProjectId,
       shot_id:    null,
@@ -214,7 +376,7 @@ const useStore = create((set, get) => ({
       creator:    currentUser?.id || 'maam',
       created_at: new Date().toISOString(),
       ...refData,
-    }
+    })
     set((state) => ({ references: [...state.references, newRef] }))
     get()._saveLocal()
     if (isSupabaseConfigured) await supabase.from('shot_references').insert(newRef)
@@ -288,6 +450,14 @@ const useStore = create((set, get) => ({
     if (isSupabaseConfigured) await supabase.from('styling_pairings').delete().eq('id', id)
   },
 
+  async updateStylingPairing(id, updates) {
+    set((state) => ({
+      stylingPairings: state.stylingPairings.map((p) => p.id === id ? { ...p, ...updates } : p),
+    }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) await supabase.from('styling_pairings').update(updates).eq('id', id)
+  },
+
   // --- Products ---
   async addProduct(productData) {
     const { activeProjectId } = get()
@@ -304,6 +474,76 @@ const useStore = create((set, get) => ({
     get()._saveLocal()
     if (isSupabaseConfigured) await supabase.from('product_colors').insert(c)
     return c
+  },
+
+  async deleteProductColor(id) {
+    set((state) => ({ productColors: state.productColors.filter((c) => c.id !== id) }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) await supabase.from('product_colors').delete().eq('id', id)
+  },
+
+  async deleteProduct(id) {
+    set((state) => ({
+      products:      state.products.filter((p) => p.id !== id),
+      productColors: state.productColors.filter((c) => c.product_id !== id),
+    }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) await supabase.from('products').delete().eq('id', id)
+  },
+
+  async saveShootOrder(orderedIds) {
+    const updates = orderedIds.map((id, i) => ({ id, shot_number: i + 1 }))
+    set((state) => ({
+      shots: state.shots.map((s) => {
+        const u = updates.find((x) => x.id === s.id)
+        return u ? { ...s, shot_number: u.shot_number } : s
+      }),
+    }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) {
+      await Promise.all(updates.map(({ id, shot_number }) =>
+        supabase.from('shots').update({ shot_number }).eq('id', id)
+      ))
+    }
+  },
+
+  // --- Content Items (Instagram / Pinterest) ---
+  async addContentItem(data) {
+    const { currentUser, activeProjectId } = get()
+    const item = {
+      id:          uid(),
+      project_id:  activeProjectId,
+      user_id:     currentUser?.id,
+      platform:    'instagram',
+      status:      'idea',
+      analytics:   {},
+      created_at:  new Date().toISOString(),
+      updated_at:  new Date().toISOString(),
+      ...data,
+    }
+    set((s) => ({ contentItems: [item, ...s.contentItems] }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('content_items').insert(item)
+      if (error) console.error('content_items insert:', error)
+    }
+    return item
+  },
+
+  async updateContentItem(id, updates) {
+    set((s) => ({
+      contentItems: s.contentItems.map((c) =>
+        c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c
+      ),
+    }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) await supabase.from('content_items').update(updates).eq('id', id)
+  },
+
+  async deleteContentItem(id) {
+    set((s) => ({ contentItems: s.contentItems.filter((c) => c.id !== id) }))
+    get()._saveLocal()
+    if (isSupabaseConfigured) await supabase.from('content_items').delete().eq('id', id)
   },
 
   // --- Image upload ---

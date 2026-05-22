@@ -1,83 +1,125 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, ArrowRight, Zap } from 'lucide-react'
 import useStore from '../store/useStore'
 
 export default function Login() {
   const navigate = useNavigate()
-  const loginAs = useStore((s) => s.loginAs)
-  const [pressing, setPressing] = useState(null)
+  const { signIn, authLoading } = useStore()
 
-  const handleLogin = (key) => {
-    setPressing(key)
-    setTimeout(() => {
-      loginAs(key)
+  const [emailOrUsername, setEmailOrUsername] = useState('')
+  const [password,        setPassword]        = useState('')
+  const [showPass,        setShowPass]        = useState(false)
+  const [localError,      setLocalError]      = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLocalError('')
+    if (!emailOrUsername.trim() || !password) {
+      setLocalError('Please fill in all fields')
+      return
+    }
+    try {
+      await signIn({ emailOrUsername, password })
       navigate('/home')
-    }, 200)
+    } catch (err) {
+      setLocalError(err.message || 'Login failed. Check your credentials.')
+    }
   }
 
   return (
-    <div className="min-h-screen bg-ivory-100 flex flex-col">
-      {/* Brand mark */}
-      <div className="pt-16 pb-10 px-8 text-center animate-login-brand">
-        <p className="text-[11px] tracking-[0.25em] uppercase text-ink-400 font-medium mb-2">
-          Indirookh
-        </p>
-        <h1 className="font-display text-4xl font-medium text-ink-900 leading-tight">
-          Shoot OS
-        </h1>
-        <p className="text-sm text-ink-400 mt-3 font-light">
-          Your shoot execution system
-        </p>
-      </div>
-
-      {/* User cards */}
-      <div className="flex-1 px-6 flex flex-col justify-center gap-4 max-w-sm mx-auto w-full">
-        <p className="text-xs text-ink-400 text-center uppercase tracking-widest mb-1 animate-login-who">
-          Who are you today?
-        </p>
-
-        {/* Ma'am */}
-        <div className="animate-login-card1">
-          <button
-            onClick={() => handleLogin('maam')}
-            className={`group relative bg-ivory-50 border border-ivory-200 rounded-3xl p-6
-              shadow-card transition-all duration-150 text-left overflow-hidden w-full
-              ${pressing === 'maam' ? 'animate-card-press' : 'active:scale-[0.98]'}`}
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-camel-100/40 -translate-y-8 translate-x-8" />
-            <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-camel-100 flex items-center justify-center mb-4">
-                <span className="font-display text-xl text-camel-500">M</span>
-              </div>
-              <h2 className="font-display text-2xl font-medium text-ink-900 mb-1">Ma'am</h2>
-              <p className="text-sm text-ink-400">Creative direction & planning</p>
-            </div>
-          </button>
-        </div>
-
-        {/* Daksh */}
-        <div className="animate-login-card2">
-          <button
-            onClick={() => handleLogin('daksh')}
-            className={`group relative bg-ivory-50 border border-ivory-200 rounded-3xl p-6
-              shadow-card transition-all duration-150 text-left overflow-hidden w-full
-              ${pressing === 'daksh' ? 'animate-card-press' : 'active:scale-[0.98]'}`}
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-earth-300/20 -translate-y-8 translate-x-8" />
-            <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-earth-300/30 flex items-center justify-center mb-4">
-                <span className="font-display text-xl text-earth-400">D</span>
-              </div>
-              <h2 className="font-display text-2xl font-medium text-ink-900 mb-1">Daksh</h2>
-              <p className="text-sm text-ink-400">Execution & shoot management</p>
-            </div>
-          </button>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Brand header */}
+      <div className="px-6 pt-12 pb-2 animate-auth-brand">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-camel-500 flex items-center justify-center shadow-lifted">
+            <Zap size={16} className="text-white" fill="white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-ink-900 tracking-tight leading-none">Brandrop OS</p>
+            <p className="text-[10px] text-ink-400 leading-none mt-0.5">Content Operating System</p>
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="pb-12 pt-6 text-center animate-login-footer">
-        <p className="text-xs text-ink-200">SS26 Shoot Season</p>
+      {/* Form */}
+      <div className="flex-1 flex flex-col justify-center px-6 pb-8 max-w-sm mx-auto w-full">
+        <div className="mb-8 animate-auth-field1">
+          <h1 className="text-2xl font-bold text-ink-900 tracking-tight mb-1">Welcome back</h1>
+          <p className="text-sm text-ink-400">Sign in to your workspace</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="animate-auth-field1">
+            <label className="block text-[11px] font-semibold text-ink-500 mb-1.5 uppercase tracking-wider">
+              Email or Username
+            </label>
+            <input
+              type="text"
+              value={emailOrUsername}
+              onChange={(e) => setEmailOrUsername(e.target.value)}
+              placeholder="you@brand.com or @username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="w-full bg-ivory-100 border border-ivory-300 rounded-xl px-4 py-3.5 text-sm
+                text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-camel-300
+                focus:border-camel-400 transition-all"
+            />
+          </div>
+
+          <div className="animate-auth-field2">
+            <label className="block text-[11px] font-semibold text-ink-500 mb-1.5 uppercase tracking-wider">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-ivory-100 border border-ivory-300 rounded-xl px-4 py-3.5 pr-12 text-sm
+                  text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-camel-300
+                  focus:border-camel-400 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-ink-400 active:text-ink-700"
+              >
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {localError && (
+            <div className="animate-fade-in bg-rose-100 border border-rose-300 rounded-xl px-4 py-3">
+              <p className="text-xs text-rose-500 font-medium">{localError}</p>
+            </div>
+          )}
+
+          <div className="pt-1 animate-auth-btn">
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full flex items-center justify-center gap-2 bg-camel-500 text-white
+                font-semibold rounded-xl py-3.5 text-sm tracking-tight
+                disabled:opacity-60 active:bg-camel-600 transition-colors shadow-lifted"
+            >
+              {authLoading ? 'Signing in…' : <><span>Sign in</span><ArrowRight size={15} /></>}
+            </button>
+          </div>
+        </form>
+
+        <p className="text-center text-sm text-ink-400 mt-6 animate-auth-footer">
+          New to Brandrop OS?{' '}
+          <button onClick={() => navigate('/signup')} className="text-camel-500 font-semibold active:text-camel-600">
+            Create workspace
+          </button>
+        </p>
+      </div>
+
+      <div className="px-6 pb-8 text-center animate-auth-footer">
+        <p className="text-[10px] text-ink-400">Brandrop OS · Content Operating System for brands &amp; creators</p>
       </div>
     </div>
   )

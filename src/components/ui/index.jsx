@@ -15,12 +15,12 @@ export function Button({ children, variant = 'primary', className = '', size = '
     full: 'w-full px-5 py-3.5 text-sm',
   }
   const variants = {
-    primary: 'bg-ink-900 text-ivory-100 active:bg-ink-800',
+    primary: 'bg-camel-500 text-white active:bg-camel-600 shadow-lifted',
     ghost:   'bg-ivory-200 text-ink-800 active:bg-ivory-300',
-    outline: 'border border-ink-200 text-ink-800 active:bg-ivory-200',
-    done:    'bg-moss-400 text-white active:bg-moss-500',
-    danger:  'bg-rose-100 text-earth-500 active:bg-rose-300',
-    camel:   'bg-camel-300 text-white active:bg-camel-400',
+    outline: 'border border-ivory-300 text-ink-700 active:bg-ivory-200',
+    done:    'bg-moss-500 text-white active:bg-moss-600',
+    danger:  'bg-rose-100 text-rose-500 active:bg-rose-300',
+    camel:   'bg-camel-500 text-white active:bg-camel-600',
   }
   return (
     <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props}>
@@ -72,7 +72,7 @@ export function MediaTypeBadge({ mediaType }) {
 // ─── Card ────────────────────────────────────────────────────────────────────
 export function Card({ children, className = '', ...props }) {
   return (
-    <div className={`bg-ivory-50 rounded-2xl shadow-card border border-ivory-200 overflow-hidden ${className}`} {...props}>
+    <div className={`bg-white rounded-2xl shadow-card border border-ivory-200 overflow-hidden ${className}`} {...props}>
       {children}
     </div>
   )
@@ -153,7 +153,7 @@ export function Modal({ open, onClose, title, children }) {
       <div className="absolute inset-0 bg-ink-900/40 backdrop-blur-sm" onClick={onClose} />
       {/* sheet — pinned below the 56px layout header */}
       <div
-        className="absolute left-0 right-0 bottom-0 bg-ivory-50 rounded-t-3xl shadow-lifted flex flex-col animate-sheet-up"
+        className="absolute left-0 right-0 bottom-0 bg-white rounded-t-3xl shadow-lifted flex flex-col animate-sheet-up"
         style={{ top: '56px' }}
       >
         {/* sticky header */}
@@ -228,7 +228,7 @@ export function FilterChip({ label, active, onClick }) {
     <button
       onClick={onClick}
       className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors
-        ${active ? 'bg-ink-900 text-ivory-100' : 'bg-ivory-200 text-ink-600'}`}
+        ${active ? 'bg-camel-500 text-white' : 'bg-ivory-200 text-ink-600'}`}
     >
       {label}
     </button>

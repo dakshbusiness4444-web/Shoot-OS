@@ -101,7 +101,7 @@ function AddReferenceModal({ open, onClose }) {
   )
 }
 
-function ReferenceCard({ ref: r }) {
+function ReferenceCard({ item: r }) {
   const { deleteReference } = useStore()
 
   return (
@@ -193,7 +193,7 @@ export default function ReferenceLibrary() {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           {filtered.map((r) => (
-            <ReferenceCard key={r.id} ref={r} />
+            <ReferenceCard key={r.id} item={r} />
           ))}
         </div>
       )}
