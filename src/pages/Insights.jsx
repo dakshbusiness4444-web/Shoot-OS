@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, ChevronRight, ChevronLeft,
   Eye, Heart, MessageCircle, Share2, Bookmark, Users, BarChart3,
-  Calendar, Image as ImageIcon, ArrowLeft, Plus, Award
+  Calendar, Image as ImageIcon, ArrowLeft, Plus, Award, Instagram,
+  RefreshCw, Loader2, ExternalLink
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
@@ -468,6 +469,258 @@ function DayWiseView({ posted }) {
   )
 }
 
+// ── Instagram Live Data View (from API) ──────────────────────────────────────
+function InstagramLiveSection() {
+  const { instagramAccount, igMedia, igLoading, syncInstagramData } = useStore()
+  const [filter, setFilter] = useState('all')   // all | reel | post | carousel
+  const [selected, setSelected] = useState(null)
+
+  // Auto-sync on mount if data is stale
+  useEffect(() => {
+    if (instagramAccount?.access_token && igMedia.length === 0) {
+      syncInstagramData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instagramAccount?.access_token])
+
+  if (!instagramAccount?.access_token) return null
+
+  // Filter media by type
+  const filteredMedia = igMedia.filter((p) => {
+    if (filter === 'all') return true
+    if (filter === 'reel') return p.media_type === 'VIDEO'
+    if (filter === 'carousel') return p.media_type === 'CAROUSEL_ALBUM'
+    if (filter === 'post') return p.media_type === 'IMAGE'
+    return true
+  })
+
+  // Stats
+  const totalLikes    = igMedia.reduce((s, p) => s + (p.like_count || 0), 0)
+  const totalComments = igMedia.reduce((s, p) => s + (p.comments_count || 0), 0)
+  const avgLikes      = igMedia.length > 0 ? Math.round(totalLikes / igMedia.length) : 0
+  const engRate       = instagramAccount.followers_count > 0 && igMedia.length > 0
+    ? (((totalLikes + totalComments) / igMedia.length / instagramAccount.followers_count) * 100).toFixed(2)
+    : '—'
+
+  // Detail view
+  if (selected) {
+    const p = selected
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setSelected(null)}
+          className="flex items-center gap-1.5 text-[12px] font-bold text-camel-600 active:opacity-70">
+          <ArrowLeft size={13} /> Back to all posts
+        </button>
+
+        <div className="bg-white rounded-2xl border border-ivory-200 shadow-soft overflow-hidden">
+          <img
+            src={p.media_type === 'VIDEO' ? p.thumbnail_url : p.media_url}
+            alt=""
+            className="w-full aspect-square object-cover bg-ivory-100"
+          />
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-bold text-camel-600 bg-camel-50 px-2 py-0.5 rounded-full uppercase">
+                {p.media_type === 'VIDEO' ? 'Reel' : p.media_type === 'CAROUSEL_ALBUM' ? 'Carousel' : 'Post'}
+              </span>
+              <span className="text-[10px] text-ink-400">
+                📅 {new Date(p.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <a href={p.permalink} target="_blank" rel="noopener noreferrer"
+                className="ml-auto text-[10px] font-bold text-camel-500 flex items-center gap-1">
+                Open on IG <ExternalLink size={9} />
+              </a>
+            </div>
+            {p.caption && (
+              <p className="text-[12px] text-ink-700 leading-relaxed whitespace-pre-wrap line-clamp-6">
+                {p.caption}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-white rounded-2xl border border-ivory-200 p-4 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Heart size={13} className="text-rose-500" />
+              <p className="text-[10px] font-bold text-ink-500 uppercase">Likes</p>
+            </div>
+            <p className="text-2xl font-black text-ink-900">{formatNumber(p.like_count)}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-ivory-200 p-4 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <MessageCircle size={13} className="text-moss-500" />
+              <p className="text-[10px] font-bold text-ink-500 uppercase">Comments</p>
+            </div>
+            <p className="text-2xl font-black text-ink-900">{formatNumber(p.comments_count)}</p>
+          </div>
+        </div>
+
+        {instagramAccount.followers_count > 0 && (
+          <div className="bg-gradient-to-r from-camel-500 to-camel-600 rounded-2xl p-4 text-white">
+            <p className="text-[11px] font-bold text-white/70 uppercase tracking-wider">Engagement Rate</p>
+            <p className="text-3xl font-black mt-1">
+              {(((p.like_count || 0) + (p.comments_count || 0)) / instagramAccount.followers_count * 100).toFixed(2)}%
+            </p>
+            <p className="text-[11px] text-white/70 mt-1">(likes + comments) ÷ followers</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Account header */}
+      <div className="bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045] rounded-3xl p-5 text-white shadow-lifted">
+        <div className="flex items-center gap-3 mb-3">
+          {instagramAccount.profile_picture_url ? (
+            <img src={instagramAccount.profile_picture_url}
+              className="w-12 h-12 rounded-full border-2 border-white/50" alt="" />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+              <Instagram size={20} />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-black truncate">@{instagramAccount.username}</p>
+            <p className="text-[11px] text-white/80 truncate">{instagramAccount.name}</p>
+          </div>
+          <button onClick={() => syncInstagramData()} disabled={igLoading}
+            className="bg-white/20 active:bg-white/30 rounded-xl p-2">
+            {igLoading
+              ? <Loader2 size={14} className="animate-spin" />
+              : <RefreshCw size={14} />
+            }
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/20">
+          <div>
+            <p className="text-xl font-black">{formatNumber(instagramAccount.followers_count)}</p>
+            <p className="text-[10px] text-white/70 font-medium">Followers</p>
+          </div>
+          <div>
+            <p className="text-xl font-black">{formatNumber(instagramAccount.media_count)}</p>
+            <p className="text-[10px] text-white/70 font-medium">Posts</p>
+          </div>
+          <div>
+            <p className="text-xl font-black">{engRate}%</p>
+            <p className="text-[10px] text-white/70 font-medium">Avg Eng.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Aggregate stats */}
+      {igMedia.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <div className="bg-white rounded-2xl border border-ivory-200 p-3.5 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Heart size={12} className="text-rose-500" />
+              <p className="text-[10px] font-bold text-ink-400 uppercase">Total Likes</p>
+            </div>
+            <p className="text-xl font-black text-ink-900">{formatNumber(totalLikes)}</p>
+            <p className="text-[10px] text-ink-400">last {igMedia.length} posts</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-ivory-200 p-3.5 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1">
+              <MessageCircle size={12} className="text-moss-500" />
+              <p className="text-[10px] font-bold text-ink-400 uppercase">Total Comments</p>
+            </div>
+            <p className="text-xl font-black text-ink-900">{formatNumber(totalComments)}</p>
+            <p className="text-[10px] text-ink-400">last {igMedia.length} posts</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-ivory-200 p-3.5 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Heart size={12} className="text-rose-500" />
+              <p className="text-[10px] font-bold text-ink-400 uppercase">Avg Likes</p>
+            </div>
+            <p className="text-xl font-black text-ink-900">{formatNumber(avgLikes)}</p>
+            <p className="text-[10px] text-ink-400">per post</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-ivory-200 p-3.5 shadow-soft">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp size={12} className="text-camel-500" />
+              <p className="text-[10px] font-bold text-ink-400 uppercase">Engagement</p>
+            </div>
+            <p className="text-xl font-black text-ink-900">{engRate}%</p>
+            <p className="text-[10px] text-ink-400">avg rate</p>
+          </div>
+        </div>
+      )}
+
+      {/* Filter tabs */}
+      {igMedia.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {['all', 'reel', 'post', 'carousel'].map((f) => (
+            <button key={f}
+              onClick={() => setFilter(f)}
+              className={`flex-shrink-0 text-[11px] font-bold px-3.5 py-1.5 rounded-full transition-colors
+                ${filter === f ? 'bg-ink-900 text-white' : 'bg-ivory-100 text-ink-500 active:bg-ivory-200'}`}>
+              {f === 'all' ? `All · ${igMedia.length}` :
+               f === 'reel' ? `🎬 Reels · ${igMedia.filter(p => p.media_type === 'VIDEO').length}` :
+               f === 'post' ? `📸 Posts · ${igMedia.filter(p => p.media_type === 'IMAGE').length}` :
+               `🎠 Carousels · ${igMedia.filter(p => p.media_type === 'CAROUSEL_ALBUM').length}`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Media grid */}
+      {igLoading && igMedia.length === 0 ? (
+        <div className="py-12 flex flex-col items-center gap-3">
+          <Loader2 size={24} className="text-camel-500 animate-spin" />
+          <p className="text-[12px] text-ink-400">Loading your Instagram posts…</p>
+        </div>
+      ) : filteredMedia.length > 0 ? (
+        <div className="grid grid-cols-3 gap-2">
+          {filteredMedia.map((p) => (
+            <button key={p.id} onClick={() => setSelected(p)}
+              className="relative group rounded-xl overflow-hidden aspect-square bg-ivory-100">
+              {(p.media_url || p.thumbnail_url) && (
+                <img
+                  src={p.media_type === 'VIDEO' ? p.thumbnail_url : p.media_url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              )}
+              {/* Type indicator */}
+              {p.media_type === 'VIDEO' && (
+                <span className="absolute top-1.5 right-1.5 text-[9px] font-bold bg-black/60 text-white px-1.5 py-0.5 rounded-full">
+                  🎬
+                </span>
+              )}
+              {p.media_type === 'CAROUSEL_ALBUM' && (
+                <span className="absolute top-1.5 right-1.5 text-[9px] font-bold bg-black/60 text-white px-1.5 py-0.5 rounded-full">
+                  🎠
+                </span>
+              )}
+              {/* Stats overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent
+                flex flex-col justify-end p-2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+                <div className="flex items-center gap-2 text-white">
+                  <span className="flex items-center gap-0.5 text-[10px] font-bold">
+                    <Heart size={10} fill="white" /> {formatNumber(p.like_count)}
+                  </span>
+                  <span className="flex items-center gap-0.5 text-[10px] font-bold">
+                    <MessageCircle size={10} /> {formatNumber(p.comments_count)}
+                  </span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="py-8 text-center bg-ivory-50 rounded-2xl border border-ivory-200">
+          <p className="text-[12px] text-ink-400">No posts in this category</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 const VIEWS = [
   { id: 'overall',  label: 'Overall',  icon: BarChart3 },
@@ -477,17 +730,41 @@ const VIEWS = [
 
 export default function Insights() {
   const navigate = useNavigate()
-  const { contentItems, shots, activeProjectId } = useStore()
+  const { contentItems, shots, activeProjectId, instagramAccount } = useStore()
   const [view, setView] = useState('overall')
+  const [source, setSource] = useState(instagramAccount?.access_token ? 'live' : 'manual')  // live | manual
   const [selectedPostId, setSelectedPostId] = useState(null)
 
   const ig = contentItems.filter((c) => c.platform === 'instagram' && c.project_id === activeProjectId)
   const posted = ig.filter((c) => c.status === 'posted' || c.status === 'analyzed')
 
   const recs = generateRecommendations(contentItems, shots, activeProjectId)
+  const igConnected = !!instagramAccount?.access_token
 
   return (
     <div className="space-y-5 pb-2">
+
+      {/* ── Data source switcher (only when connected) ──── */}
+      {igConnected && (
+        <div className="bg-ivory-100 rounded-2xl p-1 flex gap-1">
+          <button onClick={() => setSource('live')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-bold transition-all
+              ${source === 'live' ? 'bg-white text-ink-900 shadow-soft' : 'text-ink-500'}`}>
+            <Instagram size={13} />
+            Instagram Live
+            <span className="text-[10px] font-bold bg-moss-100 text-moss-600 px-1.5 py-0 rounded-full">●</span>
+          </button>
+          <button onClick={() => setSource('manual')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-bold transition-all
+              ${source === 'manual' ? 'bg-white text-ink-900 shadow-soft' : 'text-ink-500'}`}>
+            <BarChart3 size={13} />
+            Manual Reports
+          </button>
+        </div>
+      )}
+
+      {/* ── Live Instagram data ──────────────────────────── */}
+      {igConnected && source === 'live' && <InstagramLiveSection />}
 
       {/* ── AI Strategist ────────────────────────────────── */}
       <div>
@@ -505,14 +782,15 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* ── View Switcher ────────────────────────────────── */}
+      {/* ── Manual Reports section ─────────────────────── */}
+      {(!igConnected || source === 'manual') && (
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-7 h-7 rounded-xl bg-ink-900 flex items-center justify-center">
             <BarChart3 size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-[15px] font-bold text-ink-900 leading-none">Performance Analytics</p>
+            <p className="text-[15px] font-bold text-ink-900 leading-none">Manual Reports</p>
             <p className="text-[10px] text-ink-400">{posted.length} posted · {ig.length - posted.length} in pipeline</p>
           </div>
         </div>
@@ -541,6 +819,7 @@ export default function Insights() {
         {view === 'per-post' && <PerPostView  posted={posted} selectedId={selectedPostId} setSelectedId={setSelectedPostId} />}
         {view === 'day-wise' && <DayWiseView  posted={posted} />}
       </div>
+      )}
 
     </div>
   )
