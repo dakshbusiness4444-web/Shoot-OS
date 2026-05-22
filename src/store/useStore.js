@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { SEED_PROJECT, SEED_PRODUCTS, SEED_COLORS } from '../data/seedData'
-import { fetchIgProfile, fetchIgMedia } from '../lib/instagram'
+import { fetchIgProfile, fetchIgMedia, fetchIgMediaWithInsights } from '../lib/instagram'
 
 const LOCAL_DATA_KEY  = 'brandropos_data_v1'
 
@@ -266,14 +266,16 @@ const useStore = create((set, get) => ({
     set({ instagramAccount: null, igMedia: [] })
   },
 
-  async syncInstagramData() {
+  async syncInstagramData(opts = {}) {
     const { instagramAccount } = get()
     if (!instagramAccount?.access_token) return
     set({ igLoading: true })
     try {
+      const limit = opts.limit || 50
+      // Fetch profile + media-with-insights in parallel
       const [profile, mediaData] = await Promise.all([
         fetchIgProfile(instagramAccount.access_token),
-        fetchIgMedia(instagramAccount.access_token),
+        fetchIgMediaWithInsights(instagramAccount.access_token, limit),
       ])
       if (isSupabaseConfigured) {
         await supabase.from('instagram_accounts').update({

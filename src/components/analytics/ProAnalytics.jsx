@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   BarChart3, TrendingUp, Heart, MessageCircle, Eye, Bookmark, Share2,
-  Calendar, Award, Users, Sparkles, Target, FileDown,
-  ChevronRight, ChevronDown, Filter, ArrowRightLeft, Crown, Flame,
-  Loader2, Plus, X
+  Calendar, Award, Users, Sparkles, Target, FileDown, Hash, Type,
+  ChevronRight, ChevronDown, ChevronUp, Filter, ArrowRightLeft, Crown, Flame,
+  Loader2, Plus, X, Search, SlidersHorizontal, RefreshCw, CalendarDays, Clock
 } from 'lucide-react'
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
@@ -880,40 +880,523 @@ function ExportPDF({ reportRef, brandName }) {
   )
 }
 
-// ── Main Pro Analytics Component ────────────────────────────────────────────
-const SECTIONS = [
-  { id: 'patterns',    label: 'AI Insights',  icon: Sparkles },
-  { id: 'leaderboard', label: 'Leaderboard',  icon: Crown },
-  { id: 'trends',      label: 'Trends',       icon: TrendingUp },
-  { id: 'types',       label: 'Content Mix',  icon: BarChart3 },
-  { id: 'heatmap',     label: 'Time Heatmap', icon: Flame },
-  { id: 'compare',     label: 'Compare',      icon: ArrowRightLeft },
-  { id: 'custom',      label: 'Custom Report',icon: Filter },
-  { id: 'goals',       label: 'Goals',        icon: Target },
+// ── Hashtag Analysis ────────────────────────────────────────────────────────
+function HashtagAnalysis({ posted }) {
+  const stats = useMemo(() => {
+    const tags = {}
+    posted.forEach((p) => {
+      const caption = (p.caption || '') + ' ' + (p.hashtags || '')
+      const found = caption.match(/#[a-zA-Z0-9_]+/g) || []
+      const uniq = [...new Set(found.map((t) => t.toLowerCase()))]
+      const eng = getEngagement(p)
+      const reach = p.analytics?.reach || 0
+      uniq.forEach((t) => {
+        if (!tags[t]) tags[t] = { tag: t, count: 0, totalEng: 0, totalReach: 0, totalLikes: 0 }
+        tags[t].count++
+        tags[t].totalEng += eng
+        tags[t].totalReach += reach
+        tags[t].totalLikes += p.analytics?.likes || 0
+      })
+    })
+    return Object.values(tags)
+      .map((t) => ({ ...t, avgEng: t.totalEng / t.count, avgReach: t.totalReach / t.count }))
+      .filter((t) => t.count >= 1)
+      .sort((a, b) => b.avgEng - a.avgEng)
+  }, [posted])
+
+  if (stats.length === 0) {
+    return (
+      <div className="bg-ivory-50 border border-ivory-200 rounded-xl p-6 text-center">
+        <Hash size={20} className="text-ink-300 mx-auto mb-2" />
+        <p className="text-[12px] text-ink-400">No hashtags found in captions yet.</p>
+      </div>
+    )
+  }
+
+  const top = stats.slice(0, 15)
+  const maxEng = Math.max(...top.map((t) => t.avgEng), 1)
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] font-bold text-ink-700 flex items-center gap-1.5">
+        <Hash size={13} className="text-camel-500" />
+        Hashtag Performance · Top {top.length} of {stats.length}
+      </p>
+      <p className="text-[10px] text-ink-400">Ranked by avg engagement per use. Min 1 use shown.</p>
+
+      <div className="space-y-1.5">
+        {top.map((t, i) => {
+          const w = (t.avgEng / maxEng) * 100
+          return (
+            <div key={t.tag} className="bg-white rounded-xl border border-ivory-200 p-2.5 shadow-soft">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-[9px] font-bold text-ink-400">#{i + 1}</span>
+                  <span className="text-[12px] font-bold text-camel-600 truncate">{t.tag}</span>
+                </div>
+                <div className="flex items-center gap-2.5 flex-shrink-0">
+                  <span className="text-[10px] text-ink-400">{t.count}× used</span>
+                  <span className="text-[12px] font-black text-ink-900">{fmt(t.avgEng)}</span>
+                </div>
+              </div>
+              <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-camel-400 to-camel-500"
+                  style={{ width: `${w}%` }} />
+              </div>
+              <p className="text-[9px] text-ink-400 mt-1">
+                avg eng/post · reach avg: {fmt(t.avgReach)} · likes total: {fmt(t.totalLikes)}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Day-of-Week breakdown ───────────────────────────────────────────────────
+function DayOfWeekChart({ posted }) {
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const data = useMemo(() => {
+    const byDay = DAYS.map((d) => ({ day: d.slice(0, 3), count: 0, totalEng: 0, totalReach: 0, totalLikes: 0 }))
+    posted.forEach((p) => {
+      const date = p.posting_date || p.posted_at
+      if (!date) return
+      const d = new Date(date).getDay()
+      byDay[d].count++
+      byDay[d].totalEng += getEngagement(p)
+      byDay[d].totalReach += p.analytics?.reach || 0
+      byDay[d].totalLikes += p.analytics?.likes || 0
+    })
+    return byDay.map((d) => ({
+      ...d,
+      avgEng: d.count > 0 ? Math.round(d.totalEng / d.count) : 0,
+      avgReach: d.count > 0 ? Math.round(d.totalReach / d.count) : 0,
+    }))
+  }, [posted])
+
+  const best = [...data].sort((a, b) => b.avgEng - a.avgEng)[0]
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] font-bold text-ink-700 flex items-center gap-1.5">
+        <CalendarDays size={13} className="text-camel-500" />
+        Engagement by Day of Week
+      </p>
+
+      {best && best.count > 0 && (
+        <div className="bg-gradient-to-r from-moss-500 to-moss-600 rounded-xl p-3 text-white">
+          <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Best Day</p>
+          <p className="text-[14px] font-black mt-0.5">
+            {DAYS[data.findIndex((d) => d.day === best.day)]} · avg {fmt(best.avgEng)} engagement
+          </p>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-ivory-200 p-3 shadow-soft">
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data}>
+            <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#6b6359' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#a8a39a' }} tickFormatter={fmt} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <Tooltip contentStyle={{ fontSize: 11, borderRadius: 12, border: '1px solid #e5e0d4' }} />
+            <Bar dataKey="avgEng" fill="#c4a572" radius={[6, 6, 0, 0]} name="Avg Engagement" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {data.map((d) => (
+          <div key={d.day} className="bg-white rounded-lg border border-ivory-200 p-2 text-center">
+            <p className="text-[10px] font-bold text-ink-500">{d.day}</p>
+            <p className="text-[14px] font-black text-ink-900 leading-tight mt-1">{d.count}</p>
+            <p className="text-[8px] text-ink-400">posts</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Caption Length Analysis ─────────────────────────────────────────────────
+function CaptionAnalysis({ posted }) {
+  const buckets = useMemo(() => {
+    const b = [
+      { label: '<50 chars',    min: 0,    max: 50,    posts: [], count: 0, eng: 0, saves: 0 },
+      { label: '50-150',       min: 50,   max: 150,   posts: [], count: 0, eng: 0, saves: 0 },
+      { label: '150-300',      min: 150,  max: 300,   posts: [], count: 0, eng: 0, saves: 0 },
+      { label: '300-500',      min: 300,  max: 500,   posts: [], count: 0, eng: 0, saves: 0 },
+      { label: '500+',         min: 500,  max: Infinity, posts: [], count: 0, eng: 0, saves: 0 },
+    ]
+    posted.forEach((p) => {
+      const len = (p.caption || '').length
+      const bucket = b.find((x) => len >= x.min && len < x.max)
+      if (bucket) {
+        bucket.count++
+        bucket.eng += getEngagement(p)
+        bucket.saves += p.analytics?.saves || 0
+      }
+    })
+    return b.map((x) => ({
+      ...x,
+      avgEng: x.count > 0 ? Math.round(x.eng / x.count) : 0,
+      avgSaves: x.count > 0 ? Math.round(x.saves / x.count) : 0,
+    }))
+  }, [posted])
+
+  const best = [...buckets].filter((b) => b.count > 0).sort((a, b) => b.avgEng - a.avgEng)[0]
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] font-bold text-ink-700 flex items-center gap-1.5">
+        <Type size={13} className="text-camel-500" />
+        Caption Length Performance
+      </p>
+
+      {best && (
+        <div className="bg-gradient-to-r from-camel-500 to-camel-600 rounded-xl p-3 text-white">
+          <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Sweet Spot</p>
+          <p className="text-[14px] font-black mt-0.5">
+            {best.label} · avg {fmt(best.avgEng)} engagement
+          </p>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-ivory-200 p-3 shadow-soft">
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={buckets}>
+            <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b6359' }} />
+            <YAxis tick={{ fontSize: 9, fill: '#a8a39a' }} tickFormatter={fmt} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+            <Tooltip contentStyle={{ fontSize: 11, borderRadius: 12, border: '1px solid #e5e0d4' }} />
+            <Bar dataKey="avgEng" fill="#8b6f3c" radius={[6, 6, 0, 0]} name="Avg Engagement" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-5 gap-1.5">
+        {buckets.map((b) => (
+          <div key={b.label} className="bg-white rounded-lg border border-ivory-200 p-2 text-center">
+            <p className="text-[9px] font-bold text-ink-400">{b.label}</p>
+            <p className="text-[14px] font-black text-ink-900 mt-1">{b.count}</p>
+            <p className="text-[8px] text-ink-400">posts</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Period Comparison ───────────────────────────────────────────────────────
+function PeriodComparison({ posted }) {
+  const [period, setPeriod] = useState('30')   // 7 | 30 | 90 | days
+
+  const { current, prev } = useMemo(() => {
+    const days = Number(period)
+    const now = Date.now()
+    const curStart = now - days * 86400 * 1000
+    const prevStart = now - 2 * days * 86400 * 1000
+    const curr = posted.filter((p) => {
+      const t = new Date(p.posting_date || p.posted_at).getTime()
+      return t >= curStart && t <= now
+    })
+    const previous = posted.filter((p) => {
+      const t = new Date(p.posting_date || p.posted_at).getTime()
+      return t >= prevStart && t < curStart
+    })
+    return { current: curr, prev: previous }
+  }, [posted, period])
+
+  const sum = (arr, key) => arr.reduce((s, p) => s + (p.analytics?.[key] || 0), 0)
+
+  const metrics = [
+    { key: 'likes', label: 'Likes' },
+    { key: 'comments', label: 'Comments' },
+    { key: 'views', label: 'Views' },
+    { key: 'reach', label: 'Reach' },
+    { key: 'saves', label: 'Saves' },
+    { key: 'shares', label: 'Shares' },
+  ]
+
+  const compare = metrics.map((m) => {
+    const c = sum(current, m.key)
+    const p = sum(prev, m.key)
+    const change = p > 0 ? ((c - p) / p) * 100 : (c > 0 ? 100 : 0)
+    return { ...m, cur: c, prev: p, change }
+  })
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-bold text-ink-700 flex items-center gap-1.5">
+          <ArrowRightLeft size={13} className="text-camel-500" />
+          Period Comparison
+        </p>
+        <select value={period} onChange={(e) => setPeriod(e.target.value)}
+          className="text-[10px] font-bold bg-ivory-100 text-ink-600 px-2.5 py-1 rounded-full border-0">
+          <option value="7">Last 7 days vs prior 7</option>
+          <option value="30">Last 30 vs prior 30</option>
+          <option value="90">Last 90 vs prior 90</option>
+        </select>
+      </div>
+
+      <div className="bg-ivory-100 rounded-xl p-3 grid grid-cols-2 gap-3 text-center">
+        <div>
+          <p className="text-[10px] font-bold text-ink-400 uppercase">Current</p>
+          <p className="text-2xl font-black text-ink-900">{current.length}</p>
+          <p className="text-[10px] text-ink-400">posts</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-ink-400 uppercase">Previous</p>
+          <p className="text-2xl font-black text-ink-500">{prev.length}</p>
+          <p className="text-[10px] text-ink-400">posts</p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {compare.map((m) => {
+          const up = m.change > 0
+          const down = m.change < 0
+          return (
+            <div key={m.key} className="bg-white rounded-xl border border-ivory-200 p-3 shadow-soft">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[12px] font-bold text-ink-700">{m.label}</p>
+                <span className={`text-[11px] font-black px-2 py-0.5 rounded-full
+                  ${up ? 'bg-moss-100 text-moss-700' : down ? 'bg-rose-100 text-rose-700' : 'bg-ivory-100 text-ink-500'}`}>
+                  {up ? '↑' : down ? '↓' : '–'} {Math.abs(m.change).toFixed(0)}%
+                </span>
+              </div>
+              <div className="flex items-end gap-3">
+                <div>
+                  <p className="text-lg font-black text-ink-900 leading-none">{fmt(m.cur)}</p>
+                  <p className="text-[9px] text-ink-400">current</p>
+                </div>
+                <p className="text-[10px] text-ink-300 mb-0.5">vs</p>
+                <div>
+                  <p className="text-base font-bold text-ink-500 leading-none">{fmt(m.prev)}</p>
+                  <p className="text-[9px] text-ink-400">previous</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Advanced Filter Panel ───────────────────────────────────────────────────
+const DATE_PRESETS = [
+  { label: 'All',    days: null },
+  { label: 'Last 7d', days: 7 },
+  { label: '30d',     days: 30 },
+  { label: '90d',     days: 90 },
+  { label: '1y',      days: 365 },
 ]
 
-// Map Instagram live media to the same shape as content_items
+function FilterPanel({ filters, setFilters, posted }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const allTypes = [...new Set(posted.map((p) => p.content_type).filter(Boolean))]
+  const toggleType = (t) => {
+    const types = filters.types || []
+    setFilters({ ...filters, types: types.includes(t) ? types.filter((x) => x !== t) : [...types, t] })
+  }
+  const reset = () => setFilters({ days: null, types: [], keyword: '', minLikes: '', minReach: '', sortBy: 'date' })
+  const active = (filters.days !== null) ||
+                 (filters.types?.length > 0) ||
+                 filters.keyword || filters.minLikes || filters.minReach
+
+  return (
+    <div className="bg-white border border-ivory-200 rounded-2xl shadow-soft overflow-hidden">
+      <button onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={14} className="text-camel-500" />
+          <p className="text-[12px] font-bold text-ink-700">Filters</p>
+          {active && (
+            <span className="text-[9px] font-bold bg-camel-100 text-camel-700 px-1.5 py-0.5 rounded-full">
+              Active
+            </span>
+          )}
+        </div>
+        {expanded ? <ChevronUp size={14} className="text-ink-400" /> : <ChevronDown size={14} className="text-ink-400" />}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-ivory-100">
+          {/* Date presets */}
+          <div className="pt-2">
+            <p className="text-[9px] font-bold text-ink-400 uppercase mb-1.5">Time Range</p>
+            <div className="flex gap-1.5">
+              {DATE_PRESETS.map((d) => (
+                <button key={d.label}
+                  onClick={() => setFilters({ ...filters, days: d.days })}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full
+                    ${filters.days === d.days ? 'bg-ink-900 text-white' : 'bg-ivory-100 text-ink-500 active:bg-ivory-200'}`}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Content types */}
+          {allTypes.length > 0 && (
+            <div>
+              <p className="text-[9px] font-bold text-ink-400 uppercase mb-1.5">Content Types</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allTypes.map((t) => {
+                  const on = filters.types?.includes(t)
+                  return (
+                    <button key={t} onClick={() => toggleType(t)}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition-colors
+                        ${on ? 'bg-camel-500 text-white' : 'bg-ivory-100 text-ink-500 active:bg-ivory-200'}`}>
+                      {on ? '✓ ' : ''}{t}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Search + min thresholds */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-3">
+              <p className="text-[9px] font-bold text-ink-400 uppercase mb-1">Caption / Hashtag Search</p>
+              <div className="relative">
+                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                <input value={filters.keyword || ''}
+                  onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+                  placeholder="diwali, #fashion, indirookh…"
+                  className="w-full bg-ivory-100 border border-ivory-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px]
+                    focus:outline-none focus:ring-1 focus:ring-camel-400" />
+              </div>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-ink-400 uppercase mb-1">Min Likes</p>
+              <input type="number" value={filters.minLikes || ''}
+                onChange={(e) => setFilters({ ...filters, minLikes: e.target.value })}
+                placeholder="0"
+                className="w-full bg-ivory-100 border border-ivory-200 rounded-lg px-2 py-1.5 text-[11px]" />
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-ink-400 uppercase mb-1">Min Reach</p>
+              <input type="number" value={filters.minReach || ''}
+                onChange={(e) => setFilters({ ...filters, minReach: e.target.value })}
+                placeholder="0"
+                className="w-full bg-ivory-100 border border-ivory-200 rounded-lg px-2 py-1.5 text-[11px]" />
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-ink-400 uppercase mb-1">Sort By</p>
+              <select value={filters.sortBy || 'date'} onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                className="w-full bg-ivory-100 border border-ivory-200 rounded-lg px-2 py-1.5 text-[11px]">
+                <option value="date">Newest</option>
+                <option value="likes">Most Likes</option>
+                <option value="comments">Most Comments</option>
+                <option value="reach">Most Reach</option>
+                <option value="engagement">Total Engagement</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Reset */}
+          {active && (
+            <button onClick={reset}
+              className="text-[10px] font-bold text-rose-500 active:text-rose-600 flex items-center gap-1">
+              <X size={10} /> Clear all filters
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function applyFilters(posted, filters) {
+  let arr = [...posted]
+  if (filters.days) {
+    const cutoff = Date.now() - filters.days * 86400 * 1000
+    arr = arr.filter((p) => {
+      const t = new Date(p.posting_date || p.posted_at).getTime()
+      return t >= cutoff
+    })
+  }
+  if (filters.types?.length > 0) {
+    arr = arr.filter((p) => filters.types.includes(p.content_type))
+  }
+  if (filters.keyword) {
+    const kw = filters.keyword.toLowerCase()
+    arr = arr.filter((p) => {
+      return (p.caption || '').toLowerCase().includes(kw) ||
+             (p.title || '').toLowerCase().includes(kw) ||
+             (p.hashtags || '').toLowerCase().includes(kw)
+    })
+  }
+  if (filters.minLikes) {
+    arr = arr.filter((p) => (p.analytics?.likes || 0) >= Number(filters.minLikes))
+  }
+  if (filters.minReach) {
+    arr = arr.filter((p) => (p.analytics?.reach || 0) >= Number(filters.minReach))
+  }
+  // Sort
+  const sortBy = filters.sortBy || 'date'
+  if (sortBy === 'date') {
+    arr.sort((a, b) => new Date(b.posting_date || b.posted_at) - new Date(a.posting_date || a.posted_at))
+  } else if (sortBy === 'engagement') {
+    arr.sort((a, b) => getEngagement(b) - getEngagement(a))
+  } else {
+    arr.sort((a, b) => (b.analytics?.[sortBy] || 0) - (a.analytics?.[sortBy] || 0))
+  }
+  return arr
+}
+
+// ── Main Pro Analytics Component ────────────────────────────────────────────
+const SECTIONS = [
+  { id: 'patterns',    label: 'AI Insights',    icon: Sparkles },
+  { id: 'leaderboard', label: 'Leaderboard',    icon: Crown },
+  { id: 'trends',      label: 'Trends',         icon: TrendingUp },
+  { id: 'compare-period', label: 'Period Compare', icon: ArrowRightLeft },
+  { id: 'types',       label: 'Content Mix',    icon: BarChart3 },
+  { id: 'heatmap',     label: 'Time Heatmap',   icon: Flame },
+  { id: 'dow',         label: 'Day of Week',    icon: CalendarDays },
+  { id: 'hashtags',    label: 'Hashtags',       icon: Hash },
+  { id: 'captions',    label: 'Caption Length', icon: Type },
+  { id: 'compare',     label: 'Compare Posts',  icon: ArrowRightLeft },
+  { id: 'custom',      label: 'Custom Report',  icon: Filter },
+  { id: 'goals',       label: 'Goals',          icon: Target },
+]
+
+// Map Instagram live media (with insights) to content_item shape
 function normalizeIgMedia(media) {
   const typeMap = { 'VIDEO': 'reel', 'IMAGE': 'post', 'CAROUSEL_ALBUM': 'carousel' }
-  return media.map((m) => ({
-    id:            'ig_' + m.id,
-    title:         (m.caption || '').slice(0, 60) || `${typeMap[m.media_type] || 'post'} · ${(m.timestamp || '').split('T')[0]}`,
-    caption:       m.caption || '',
-    content_type:  typeMap[m.media_type] || 'post',
-    status:        'posted',
-    posting_date:  (m.timestamp || '').split('T')[0],
-    posted_at:     m.timestamp,
-    media_urls:    [m.media_type === 'VIDEO' ? (m.thumbnail_url || m.media_url) : m.media_url].filter(Boolean),
-    permalink:     m.permalink,
-    analytics: {
-      likes:    m.like_count || 0,
-      comments: m.comments_count || 0,
-      // Live API doesn't give views/saves/reach without insights endpoint
-      views:    0, saves: 0, reach: 0, impressions: 0,
-      shares:   0, profile_visits: 0, followers_gained: 0,
-    },
-    _source: 'instagram_live',
-  }))
+  return media.map((m) => {
+    const ins = m.insights || {}
+    const isReel = m.media_type === 'VIDEO' || m.media_product_type === 'REELS'
+    return {
+      id:            'ig_' + m.id,
+      title:         (m.caption || '').slice(0, 60) || `${typeMap[m.media_type] || 'post'} · ${(m.timestamp || '').split('T')[0]}`,
+      caption:       m.caption || '',
+      content_type:  isReel ? 'reel' : (typeMap[m.media_type] || 'post'),
+      status:        'posted',
+      posting_date:  (m.timestamp || '').split('T')[0],
+      posted_at:     m.timestamp,
+      media_urls:    [m.media_type === 'VIDEO' ? (m.thumbnail_url || m.media_url) : m.media_url].filter(Boolean),
+      permalink:     m.permalink,
+      analytics: {
+        likes:    ins.likes    ?? m.like_count     ?? 0,
+        comments: ins.comments ?? m.comments_count ?? 0,
+        views:    ins.plays    ?? 0,
+        saves:    ins.saved    ?? 0,
+        shares:   ins.shares   ?? 0,
+        reach:    ins.reach    ?? 0,
+        impressions:      ins.reach ?? 0,   // v21 deprecated 'impressions' field
+        total_interactions: ins.total_interactions ?? 0,
+        profile_visits:   0,
+        followers_gained: 0,
+      },
+      _source: 'instagram_live',
+    }
+  })
 }
 
 export default function ProAnalytics() {
@@ -943,6 +1426,14 @@ export default function ProAnalytics() {
   const followers = instagramAccount?.followers_count || 0
   const brandName = userProfile?.workspace_name || userProfile?.username || 'analytics'
   const hasBoth   = manualPosted.length > 0 && livePosted.length > 0
+
+  // Global filter state — applies to all sections
+  const [filters, setFilters] = useState({
+    days: null, types: [], keyword: '', minLikes: '', minReach: '', sortBy: 'date'
+  })
+
+  // Apply filters to posted data
+  const filtered = useMemo(() => applyFilters(posted, filters), [posted, filters])
 
   // Auto-fetch Instagram media if connected but not loaded yet
   useEffect(() => {
@@ -981,20 +1472,31 @@ export default function ProAnalytics() {
 
   return (
     <div className="space-y-4">
-      {/* Header with export */}
+      {/* Header with export + sync */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-ink-900 to-ink-700 flex items-center justify-center flex-shrink-0">
             <Sparkles size={13} className="text-camel-300" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[15px] font-black text-ink-900 leading-none">Pro Analytics</p>
-            <p className="text-[10px] text-ink-400">
-              {posted.length} posts · {livePosted.length} from IG · {manualPosted.length} manual
+            <p className="text-[10px] text-ink-400 truncate">
+              {filtered.length}/{posted.length} posts · {livePosted.length} IG · {manualPosted.length} manual
             </p>
           </div>
         </div>
-        <ExportPDF reportRef={reportRef} brandName={brandName} />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {instagramAccount?.access_token && (
+            <button onClick={() => useStore.getState().syncInstagramData()}
+              disabled={useStore.getState().igLoading}
+              className="flex items-center gap-1 bg-ivory-100 text-ink-600 text-[10px] font-bold px-2.5 py-1.5 rounded-full
+                active:bg-ivory-200 disabled:opacity-50">
+              <RefreshCw size={10} className={useStore.getState().igLoading ? 'animate-spin' : ''} />
+              Sync
+            </button>
+          )}
+          <ExportPDF reportRef={reportRef} brandName={brandName} />
+        </div>
       </div>
 
       {/* Source filter — only show when both sources have data */}
@@ -1034,16 +1536,23 @@ export default function ProAnalytics() {
         })}
       </div>
 
+      {/* Global filter panel */}
+      <FilterPanel filters={filters} setFilters={setFilters} posted={posted} />
+
       {/* Content (wrapped for PDF capture) */}
       <div ref={reportRef} className="bg-ivory-50 rounded-2xl p-3 space-y-3">
-        {section === 'patterns'    && <AutoPatterns        posted={posted} followers={followers} />}
-        {section === 'leaderboard' && <Leaderboard         posted={posted} />}
-        {section === 'trends'      && <TrendCharts         posted={posted} />}
-        {section === 'types'       && <ContentTypePie      posted={posted} />}
-        {section === 'heatmap'     && <PostingTimeHeatmap  posted={posted} />}
-        {section === 'compare'     && <ComparePosts        posted={posted} />}
-        {section === 'custom'      && <CustomReportBuilder posted={posted} />}
-        {section === 'goals'       && <Goals               posted={posted} followers={followers} />}
+        {section === 'patterns'       && <AutoPatterns        posted={filtered} followers={followers} />}
+        {section === 'leaderboard'    && <Leaderboard         posted={filtered} />}
+        {section === 'trends'         && <TrendCharts         posted={filtered} />}
+        {section === 'compare-period' && <PeriodComparison    posted={posted} />}
+        {section === 'types'          && <ContentTypePie      posted={filtered} />}
+        {section === 'heatmap'        && <PostingTimeHeatmap  posted={filtered} />}
+        {section === 'dow'            && <DayOfWeekChart      posted={filtered} />}
+        {section === 'hashtags'       && <HashtagAnalysis     posted={filtered} />}
+        {section === 'captions'       && <CaptionAnalysis     posted={filtered} />}
+        {section === 'compare'        && <ComparePosts        posted={filtered} />}
+        {section === 'custom'         && <CustomReportBuilder posted={filtered} />}
+        {section === 'goals'          && <Goals               posted={posted} followers={followers} />}
       </div>
     </div>
   )

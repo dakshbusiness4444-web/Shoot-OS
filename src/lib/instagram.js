@@ -40,11 +40,60 @@ export async function fetchIgProfile(token) {
 }
 
 // ── Media ──────────────────────────────────────────────────────────────────
-export async function fetchIgMedia(token, limit = 12) {
+export async function fetchIgMedia(token, limit = 25) {
   return igFetch(
-    `/me/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count,permalink&limit=${limit}`,
+    `/me/media?fields=id,caption,media_type,media_product_type,media_url,thumbnail_url,timestamp,like_count,comments_count,permalink&limit=${limit}`,
     token
   )
+}
+
+// ── Per-post insights (reach, saves, shares, plays, total_interactions) ───
+// Different metrics for different media types. We try the broadest set and fail
+// gracefully — Instagram returns errors per-metric if unsupported for that media.
+export async function fetchMediaInsights(token, mediaId, mediaType) {
+  // Reels (VIDEO media_product_type=REELS) support: reach,saved,likes,comments,shares,total_interactions,plays
+  // Posts/Carousels support: reach,saved,likes,comments,shares,total_interactions (no plays)
+  const isVideo = mediaType === 'VIDEO'
+  const metrics = isVideo
+    ? 'reach,saved,shares,total_interactions,plays,likes,comments'
+    : 'reach,saved,shares,total_interactions,likes,comments'
+
+  try {
+    const data = await igFetch(`/${mediaId}/insights?metric=${metrics}`, token)
+    const out = {}
+    ;(data.data || []).forEach((m) => {
+      const val = m.values?.[0]?.value
+      if (val !== undefined) out[m.name] = typeof val === 'object' ? 0 : val
+    })
+    return out
+  } catch (err) {
+    // Fall back to minimal metrics that always work
+    try {
+      const data = await igFetch(`/${mediaId}/insights?metric=reach,saved,total_interactions`, token)
+      const out = {}
+      ;(data.data || []).forEach((m) => {
+        out[m.name] = m.values?.[0]?.value || 0
+      })
+      return out
+    } catch (e2) {
+      console.warn('Insights failed for', mediaId, e2.message)
+      return {}
+    }
+  }
+}
+
+// Fetch media + enrich each with insights (parallel)
+export async function fetchIgMediaWithInsights(token, limit = 25) {
+  const mediaData = await fetchIgMedia(token, limit)
+  const media     = mediaData.data || []
+
+  // Fire all insights requests in parallel — limit concurrency lightly
+  const insightsResults = await Promise.all(
+    media.map((m) => fetchMediaInsights(token, m.id, m.media_type).catch(() => ({})))
+  )
+
+  const enriched = media.map((m, i) => ({ ...m, insights: insightsResults[i] }))
+  return { data: enriched }
 }
 
 // ── Account insights (reach / impressions / profile_views) ─────────────────
