@@ -43,7 +43,9 @@
       "Bash(git push *)",
       "Bash(git commit -m 'feat: manual token connect for Instagram \\(bypass OAuth/app review\\) *)",
       "Bash(git commit -m 'feat: QuickPastPostModal for fast past content backfill *)",
-      "Bash(git commit -m 'feat: Instagram Live Analytics section on Insights page *)"
+      "Bash(git commit -m 'feat: Instagram Live Analytics section on Insights page *)",
+      "Bash(npm list *)",
+      "Bash(git commit -m 'feat: Pro Analytics — advanced reporting dashboard *)"
     ]
   }
 }

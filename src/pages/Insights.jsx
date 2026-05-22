@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
+import ProAnalytics from '../components/analytics/ProAnalytics'
 
 // ── Smart recommendations engine (rule-based) ─────────────────────────────
 export function generateRecommendations(contentItems, shots, projectId) {
@@ -732,7 +733,7 @@ export default function Insights() {
   const navigate = useNavigate()
   const { contentItems, shots, activeProjectId, instagramAccount } = useStore()
   const [view, setView] = useState('overall')
-  const [source, setSource] = useState(instagramAccount?.access_token ? 'live' : 'manual')  // live | manual
+  const [source, setSource] = useState('pro')  // pro | live | manual
   const [selectedPostId, setSelectedPostId] = useState(null)
 
   const ig = contentItems.filter((c) => c.platform === 'instagram' && c.project_id === activeProjectId)
@@ -744,29 +745,39 @@ export default function Insights() {
   return (
     <div className="space-y-5 pb-2">
 
-      {/* ── Data source switcher (only when connected) ──── */}
-      {igConnected && (
-        <div className="bg-ivory-100 rounded-2xl p-1 flex gap-1">
+      {/* ── Source switcher (always show — 3 modes) ────── */}
+      <div className="bg-ivory-100 rounded-2xl p-1 flex gap-1">
+        <button onClick={() => setSource('pro')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all
+            ${source === 'pro' ? 'bg-ink-900 text-white shadow-soft' : 'text-ink-500'}`}>
+          <Sparkles size={12} />
+          Pro Reports
+        </button>
+        {igConnected && (
           <button onClick={() => setSource('live')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-bold transition-all
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all
               ${source === 'live' ? 'bg-white text-ink-900 shadow-soft' : 'text-ink-500'}`}>
-            <Instagram size={13} />
-            Instagram Live
-            <span className="text-[10px] font-bold bg-moss-100 text-moss-600 px-1.5 py-0 rounded-full">●</span>
+            <Instagram size={12} />
+            IG Live
+            <span className="w-1.5 h-1.5 rounded-full bg-moss-500" />
           </button>
-          <button onClick={() => setSource('manual')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-bold transition-all
-              ${source === 'manual' ? 'bg-white text-ink-900 shadow-soft' : 'text-ink-500'}`}>
-            <BarChart3 size={13} />
-            Manual Reports
-          </button>
-        </div>
-      )}
+        )}
+        <button onClick={() => setSource('manual')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition-all
+            ${source === 'manual' ? 'bg-white text-ink-900 shadow-soft' : 'text-ink-500'}`}>
+          <BarChart3 size={12} />
+          Simple
+        </button>
+      </div>
+
+      {/* ── Pro Reports ─────────────────────────────────── */}
+      {source === 'pro' && <ProAnalytics />}
 
       {/* ── Live Instagram data ──────────────────────────── */}
       {igConnected && source === 'live' && <InstagramLiveSection />}
 
-      {/* ── AI Strategist ────────────────────────────────── */}
+      {/* ── AI Strategist (only on manual view) ──────────── */}
+      {source === 'manual' && (
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-7 h-7 rounded-xl bg-camel-500 flex items-center justify-center">
@@ -781,9 +792,10 @@ export default function Insights() {
           {recs.map((rec, i) => <RecCard key={i} rec={rec} navigate={navigate} />)}
         </div>
       </div>
+      )}
 
-      {/* ── Manual Reports section ─────────────────────── */}
-      {(!igConnected || source === 'manual') && (
+      {/* ── Simple Manual Reports section ─────────────── */}
+      {source === 'manual' && (
       <div>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-7 h-7 rounded-xl bg-ink-900 flex items-center justify-center">
