@@ -1,26 +1,34 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import useStore from './store/useStore'
 import Layout from './components/layout/Layout'
 
-// Auth
+// Auth — eager (small + needed for first paint)
 import Login         from './pages/Login'
 import CreateAccount from './pages/CreateAccount'
+import Dashboard     from './pages/Dashboard'
 
-// Main OS sections
-import Dashboard  from './pages/Dashboard'
-import ContentPlan from './pages/ContentPlan'
-import Insights   from './pages/Insights'
-import Account    from './pages/Account'
+// Main OS sections — lazy load to keep initial bundle small
+const ContentPlan = lazy(() => import('./pages/ContentPlan'))
+const Insights    = lazy(() => import('./pages/Insights'))
+const Account     = lazy(() => import('./pages/Account'))
 
-// Shoot module (secondary — accessible via header menu)
-import ShootMode    from './pages/ShootMode'
-import PlanningMode from './pages/PlanningMode'
-import FocusMode    from './pages/FocusMode'
-import ProductPages from './pages/ProductPages'
-import ReferenceLibrary from './pages/ReferenceLibrary'
-import BTSSection   from './pages/BTSSection'
-import ExtraIdeas   from './pages/ExtraIdeas'
+// Shoot module — lazy
+const ShootMode        = lazy(() => import('./pages/ShootMode'))
+const PlanningMode     = lazy(() => import('./pages/PlanningMode'))
+const FocusMode        = lazy(() => import('./pages/FocusMode'))
+const ProductPages     = lazy(() => import('./pages/ProductPages'))
+const ReferenceLibrary = lazy(() => import('./pages/ReferenceLibrary'))
+const BTSSection       = lazy(() => import('./pages/BTSSection'))
+const ExtraIdeas       = lazy(() => import('./pages/ExtraIdeas'))
+
+function PageLoader() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-camel-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }) {
   const currentUser = useStore((s) => s.currentUser)
@@ -29,7 +37,7 @@ function ProtectedRoute({ children }) {
 }
 
 function P({ children }) {
-  return <ProtectedRoute><Layout>{children}</Layout></ProtectedRoute>
+  return <ProtectedRoute><Layout><Suspense fallback={<PageLoader />}>{children}</Suspense></Layout></ProtectedRoute>
 }
 
 function AppRoutes() {

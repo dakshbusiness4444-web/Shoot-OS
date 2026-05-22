@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, ChevronRight, ChevronLeft,
   Eye, Heart, MessageCircle, Share2, Bookmark, Users, BarChart3,
@@ -7,7 +7,9 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import useStore from '../store/useStore'
-import ProAnalytics from '../components/analytics/ProAnalytics'
+
+// Lazy-load Pro Analytics (charts + PDF libs) so initial bundle is small
+const ProAnalytics = lazy(() => import('../components/analytics/ProAnalytics'))
 
 // ── Smart recommendations engine (rule-based) ─────────────────────────────
 export function generateRecommendations(contentItems, shots, projectId) {
@@ -771,7 +773,16 @@ export default function Insights() {
       </div>
 
       {/* ── Pro Reports ─────────────────────────────────── */}
-      {source === 'pro' && <ProAnalytics />}
+      {source === 'pro' && (
+        <Suspense fallback={
+          <div className="py-12 flex flex-col items-center gap-3">
+            <Loader2 size={20} className="text-camel-500 animate-spin" />
+            <p className="text-[11px] text-ink-400">Loading Pro Analytics…</p>
+          </div>
+        }>
+          <ProAnalytics />
+        </Suspense>
+      )}
 
       {/* ── Live Instagram data ──────────────────────────── */}
       {igConnected && source === 'live' && <InstagramLiveSection />}

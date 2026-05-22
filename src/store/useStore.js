@@ -82,14 +82,35 @@ const useStore = create((set, get) => ({
       return
     }
 
-    // Check existing session
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      set({ currentUser: session.user, isLoading: true })
-      await get().loadUserProfile()
-      await get().loadFromSupabase()
-    } else {
-      set({ isLoading: false, currentUser: null })
+    // Hard timeout: never let loading screen stick for more than 6s
+    const safetyTimer = setTimeout(() => {
+      if (get().isLoading) {
+        console.warn('Init timeout — forcing app to load')
+        set({ isLoading: false })
+      }
+    }, 6000)
+
+    try {
+      // Check existing session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        set({ currentUser: session.user })
+        // Fire profile + data load in parallel — don't block on either
+        Promise.all([
+          get().loadUserProfile().catch((e) => console.error('profile load:', e)),
+          get().loadFromSupabase().catch((e) => console.error('data load:', e)),
+        ]).finally(() => {
+          clearTimeout(safetyTimer)
+          set({ isLoading: false })
+        })
+      } else {
+        clearTimeout(safetyTimer)
+        set({ isLoading: false, currentUser: null })
+      }
+    } catch (err) {
+      console.error('init error:', err)
+      clearTimeout(safetyTimer)
+      set({ isLoading: false })
     }
 
     // Listen for auth state changes
@@ -133,7 +154,6 @@ const useStore = create((set, get) => ({
         ])
 
       set({
-        isLoading:       false,
         projects,
         activeProjectId: projects[0]?.id || null,
         products,
@@ -146,10 +166,11 @@ const useStore = create((set, get) => ({
         contentItems,
         campaigns,
       })
-      // Load Instagram account in background
-      get().loadInstagramAccount()
+      // Load Instagram account in background — non-blocking
+      get().loadInstagramAccount().catch((e) => console.error('IG load:', e))
     } catch (err) {
-      set({ isLoading: false, error: err.message })
+      console.error('loadFromSupabase:', err)
+      set({ error: err.message })
     }
   },
 
