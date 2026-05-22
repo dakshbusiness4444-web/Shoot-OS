@@ -46,7 +46,10 @@
       "Bash(git commit -m 'feat: Instagram Live Analytics section on Insights page *)",
       "Bash(npm list *)",
       "Bash(git commit -m 'feat: Pro Analytics — advanced reporting dashboard *)",
-      "Bash(git commit -m 'perf: lazy-load pages + 6s init timeout to fix slow/stuck loads *)"
+      "Bash(git commit -m 'perf: lazy-load pages + 6s init timeout to fix slow/stuck loads *)",
+      "Bash(vercel --prod --yes)",
+      "Bash(vercel ls *)",
+      "Bash(git commit -m 'feat: Pro Analytics now uses live Instagram data automatically *)"
     ]
   }
 }

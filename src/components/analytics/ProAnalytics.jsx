@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   BarChart3, TrendingUp, Heart, MessageCircle, Eye, Bookmark, Share2,
   Calendar, Award, Users, Sparkles, Target, FileDown,
@@ -892,15 +892,92 @@ const SECTIONS = [
   { id: 'goals',       label: 'Goals',        icon: Target },
 ]
 
+// Map Instagram live media to the same shape as content_items
+function normalizeIgMedia(media) {
+  const typeMap = { 'VIDEO': 'reel', 'IMAGE': 'post', 'CAROUSEL_ALBUM': 'carousel' }
+  return media.map((m) => ({
+    id:            'ig_' + m.id,
+    title:         (m.caption || '').slice(0, 60) || `${typeMap[m.media_type] || 'post'} · ${(m.timestamp || '').split('T')[0]}`,
+    caption:       m.caption || '',
+    content_type:  typeMap[m.media_type] || 'post',
+    status:        'posted',
+    posting_date:  (m.timestamp || '').split('T')[0],
+    posted_at:     m.timestamp,
+    media_urls:    [m.media_type === 'VIDEO' ? (m.thumbnail_url || m.media_url) : m.media_url].filter(Boolean),
+    permalink:     m.permalink,
+    analytics: {
+      likes:    m.like_count || 0,
+      comments: m.comments_count || 0,
+      // Live API doesn't give views/saves/reach without insights endpoint
+      views:    0, saves: 0, reach: 0, impressions: 0,
+      shares:   0, profile_visits: 0, followers_gained: 0,
+    },
+    _source: 'instagram_live',
+  }))
+}
+
 export default function ProAnalytics() {
-  const { contentItems, activeProjectId, instagramAccount, userProfile } = useStore()
+  const { contentItems, activeProjectId, instagramAccount, userProfile, igMedia } = useStore()
   const [section, setSection] = useState('patterns')
+  const [sourceFilter, setSourceFilter] = useState('all')   // all | manual | live
   const reportRef = useRef()
 
-  const ig = contentItems.filter((c) => c.platform === 'instagram' && c.project_id === activeProjectId)
-  const posted = ig.filter((c) => c.status === 'posted' || c.status === 'analyzed')
+  // Manual posted content
+  const manualPosted = contentItems.filter((c) =>
+    c.platform === 'instagram' &&
+    c.project_id === activeProjectId &&
+    (c.status === 'posted' || c.status === 'analyzed')
+  ).map((c) => ({ ...c, _source: 'manual' }))
+
+  // Live Instagram data (normalized)
+  const livePosted = normalizeIgMedia(igMedia || [])
+
+  // Combine based on filter
+  const posted = useMemo(() => {
+    if (sourceFilter === 'manual') return manualPosted
+    if (sourceFilter === 'live')   return livePosted
+    return [...manualPosted, ...livePosted]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceFilter, manualPosted.length, livePosted.length])
+
   const followers = instagramAccount?.followers_count || 0
   const brandName = userProfile?.workspace_name || userProfile?.username || 'analytics'
+  const hasBoth   = manualPosted.length > 0 && livePosted.length > 0
+
+  // Auto-fetch Instagram media if connected but not loaded yet
+  useEffect(() => {
+    if (instagramAccount?.access_token && (igMedia?.length || 0) === 0) {
+      useStore.getState().syncInstagramData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instagramAccount?.access_token])
+
+  // Show empty state if no data at all
+  if (posted.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-gradient-to-br from-ink-900 to-ink-700 rounded-3xl p-6 text-white text-center">
+          <Sparkles size={28} className="text-camel-300 mx-auto mb-3" />
+          <p className="text-[16px] font-black mb-1">Pro Analytics is empty</p>
+          <p className="text-[12px] text-white/70 mb-4 leading-relaxed">
+            {instagramAccount?.access_token
+              ? 'Instagram is connected but no posts loaded yet. Try syncing.'
+              : 'Connect Instagram or add past posts manually to see advanced reports.'}
+          </p>
+          {instagramAccount?.access_token ? (
+            <button onClick={() => useStore.getState().syncInstagramData()}
+              className="bg-white/15 active:bg-white/25 text-white text-[12px] font-bold px-4 py-2 rounded-xl">
+              🔄 Sync Instagram Data
+            </button>
+          ) : (
+            <p className="text-[11px] text-white/50">
+              Go to Content → Instagram → "Add Past Post / Reel" to backfill
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -912,11 +989,34 @@ export default function ProAnalytics() {
           </div>
           <div>
             <p className="text-[15px] font-black text-ink-900 leading-none">Pro Analytics</p>
-            <p className="text-[10px] text-ink-400">{posted.length} posted · advanced reports</p>
+            <p className="text-[10px] text-ink-400">
+              {posted.length} posts · {livePosted.length} from IG · {manualPosted.length} manual
+            </p>
           </div>
         </div>
         <ExportPDF reportRef={reportRef} brandName={brandName} />
       </div>
+
+      {/* Source filter — only show when both sources have data */}
+      {hasBoth && (
+        <div className="bg-ivory-100 rounded-xl p-1 flex gap-1 text-[11px] font-bold">
+          <button onClick={() => setSourceFilter('all')}
+            className={`flex-1 py-1.5 rounded-lg transition-all
+              ${sourceFilter === 'all' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'}`}>
+            All · {manualPosted.length + livePosted.length}
+          </button>
+          <button onClick={() => setSourceFilter('live')}
+            className={`flex-1 py-1.5 rounded-lg transition-all
+              ${sourceFilter === 'live' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'}`}>
+            IG Live · {livePosted.length}
+          </button>
+          <button onClick={() => setSourceFilter('manual')}
+            className={`flex-1 py-1.5 rounded-lg transition-all
+              ${sourceFilter === 'manual' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'}`}>
+            Manual · {manualPosted.length}
+          </button>
+        </div>
+      )}
 
       {/* Section tabs */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
