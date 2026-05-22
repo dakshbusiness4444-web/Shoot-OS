@@ -35,7 +35,12 @@
       "mcp__Claude_in_Chrome__read_page",
       "mcp__Claude_in_Chrome__browser_batch",
       "mcp__Claude_in_Chrome__read_console_messages",
-      "mcp__f5d2b439-2121-4967-bfb0-c0625d3bab4a__deploy_edge_function"
+      "mcp__f5d2b439-2121-4967-bfb0-c0625d3bab4a__deploy_edge_function",
+      "mcp__f5d2b439-2121-4967-bfb0-c0625d3bab4a__get_logs",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: match Meta'\\\\''s exact Instagram OAuth URL format with force_reauth and all 5 scopes *)",
+      "Bash(git push *)"
     ]
   }
 }

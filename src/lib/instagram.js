@@ -7,20 +7,17 @@ const IG_API       = 'https://graph.instagram.com/v21.0'
 export const IG_APP_ID      = import.meta.env.VITE_INSTAGRAM_APP_ID || ''
 export const IG_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/instagram-callback`
 
-export const IG_SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_content_publish',
-  'instagram_business_manage_insights',
-].join(',')
+export const IG_SCOPES = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights'
 
-/** Build the OAuth URL — pass currentUser.id as state so the edge function can save to the right user */
+/** Build the OAuth URL — matches Meta's recommended format from "Set up Instagram business login" */
 export function getInstagramOAuthUrl(userId) {
   const params = new URLSearchParams({
-    client_id:     IG_APP_ID,
-    redirect_uri:  IG_REDIRECT_URI,
-    response_type: 'code',
-    scope:         IG_SCOPES,
-    state:         userId,
+    force_reauth: 'true',
+    client_id:    IG_APP_ID,
+    redirect_uri: IG_REDIRECT_URI,
+    response_type:'code',
+    scope:        IG_SCOPES,
+    state:        userId,
   })
   return `https://www.instagram.com/oauth/authorize?${params}`
 }
