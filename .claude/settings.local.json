@@ -41,7 +41,8 @@
       "Bash(git add *)",
       "Bash(git commit -m 'fix: match Meta'\\\\''s exact Instagram OAuth URL format with force_reauth and all 5 scopes *)",
       "Bash(git push *)",
-      "Bash(git commit -m 'feat: manual token connect for Instagram \\(bypass OAuth/app review\\) *)"
+      "Bash(git commit -m 'feat: manual token connect for Instagram \\(bypass OAuth/app review\\) *)",
+      "Bash(git commit -m 'feat: QuickPastPostModal for fast past content backfill *)"
     ]
   }
 }

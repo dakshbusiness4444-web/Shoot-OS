@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
 import {
   Plus, X, ChevronDown, ChevronUp, Sparkles, Camera, Image as ImageIcon,
-  Eye, Heart, MessageCircle, Share2, Bookmark, TrendingUp, Users, BarChart3, Trash2
+  Eye, Heart, MessageCircle, Share2, Bookmark, TrendingUp, Users, BarChart3, Trash2, Archive
 } from 'lucide-react'
 import useStore from '../../store/useStore'
+import QuickPastPostModal from '../../components/ui/QuickPastPostModal'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CONTENT_TYPES = [
@@ -376,6 +377,7 @@ function Field({ label, required, children }) {
 export default function InstagramPlan() {
   const { contentItems, activeProjectId, addContentItem, updateContentItem, deleteContentItem } = useStore()
   const [modalOpen,    setModalOpen]    = useState(false)
+  const [quickOpen,    setQuickOpen]    = useState(false)
   const [editItem,     setEditItem]     = useState(null)
   const [filterType,   setFilterType]   = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -410,6 +412,21 @@ export default function InstagramPlan() {
 
   return (
     <div className="space-y-5">
+
+      {/* Quick Add Past Post — prominent banner */}
+      <button onClick={() => setQuickOpen(true)}
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl
+          bg-gradient-to-r from-ink-900 to-ink-800 text-white shadow-lifted
+          active:opacity-90 transition-all">
+        <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+          <Archive size={14} />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <p className="text-[13px] font-bold leading-none">Add Past Post / Reel</p>
+          <p className="text-[10px] text-white/60 mt-0.5">Backfill old content with analytics</p>
+        </div>
+        <Plus size={14} className="text-white/70" />
+      </button>
 
       {summary.length > 0 && (
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
@@ -477,6 +494,11 @@ export default function InstagramPlan() {
         item={editItem}
         onClose={() => { setModalOpen(false); setEditItem(null) }}
         onSave={handleSave}
+      />
+
+      <QuickPastPostModal
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
       />
     </div>
   )
