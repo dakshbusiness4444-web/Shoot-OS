@@ -51,7 +51,8 @@
       "Bash(vercel ls *)",
       "Bash(git commit -m 'feat: Pro Analytics now uses live Instagram data automatically *)",
       "Bash(git commit -m 'feat: fix IG insights sync + advanced filters + 4 new analytics views *)",
-      "Bash(git commit -m 'feat: dark/light/system theme + fix leaderboard #2 silver color *)"
+      "Bash(git commit -m 'feat: dark/light/system theme + fix leaderboard #2 silver color *)",
+      "Bash(git commit -m 'fix: dark mode coverage — opacity variants, recharts, accent surfaces *)"
     ]
   }
 }
