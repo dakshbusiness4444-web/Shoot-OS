@@ -105,9 +105,9 @@ function Leaderboard({ posted }) {
             <div key={p.id} className="bg-white rounded-xl border border-ivory-200 p-2.5 flex items-center gap-2.5 shadow-soft">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0
                 ${i === 0 && direction === 'top' ? 'bg-amber-400 text-white' :
-                  i === 1 && direction === 'top' ? 'bg-ink-300 text-white' :
-                  i === 2 && direction === 'top' ? 'bg-amber-700 text-white' :
-                  'bg-ivory-100 text-ink-500'}`}>
+                  i === 1 && direction === 'top' ? 'bg-slate-400 text-white' :
+                  i === 2 && direction === 'top' ? 'bg-orange-700 text-white' :
+                  'bg-ivory-200 text-ink-600'}`}>
                 <span className="text-[11px] font-black">#{rank}</span>
               </div>
               {p.media_urls?.[0] && (

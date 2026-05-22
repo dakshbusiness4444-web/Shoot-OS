@@ -4,6 +4,26 @@ import { SEED_PROJECT, SEED_PRODUCTS, SEED_COLORS } from '../data/seedData'
 import { fetchIgProfile, fetchIgMedia, fetchIgMediaWithInsights } from '../lib/instagram'
 
 const LOCAL_DATA_KEY  = 'brandropos_data_v1'
+const LOCAL_THEME_KEY = 'brandropos_theme'
+
+function applyThemeClass(theme) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  const actual = theme === 'system'
+    ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme
+  if (actual === 'dark') root.classList.add('dark')
+  else root.classList.remove('dark')
+}
+
+function getInitialTheme() {
+  try {
+    return localStorage.getItem(LOCAL_THEME_KEY) || 'light'
+  } catch { return 'light' }
+}
+
+// Apply theme immediately on module load (before React mounts)
+if (typeof window !== 'undefined') applyThemeClass(getInitialTheme())
 
 function getLocalData() {
   try {
@@ -47,6 +67,15 @@ const useStore = create((set, get) => ({
   instagramAccount: null,   // row from instagram_accounts table
   igMedia:          [],     // recent posts from IG API
   igLoading:        false,
+
+  // --- Theme ---
+  theme: getInitialTheme(),   // 'light' | 'dark' | 'system'
+
+  setTheme(theme) {
+    try { localStorage.setItem(LOCAL_THEME_KEY, theme) } catch {}
+    applyThemeClass(theme)
+    set({ theme })
+  },
 
   // --- Data ---
   projects:        [],

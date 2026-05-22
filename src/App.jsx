@@ -41,7 +41,7 @@ function P({ children }) {
 }
 
 function AppRoutes() {
-  const { currentUser, isLoading, init, subscribeRealtime } = useStore()
+  const { currentUser, isLoading, init, subscribeRealtime, theme, setTheme } = useStore()
 
   useEffect(() => { init() }, [])
   useEffect(() => {
@@ -49,6 +49,15 @@ function AppRoutes() {
     const unsub = subscribeRealtime()
     return unsub
   }, [currentUser?.id])
+
+  // Re-apply theme when 'system' selected and OS theme changes
+  useEffect(() => {
+    if (theme !== 'system') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setTheme('system')
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [theme, setTheme])
 
   if (isLoading) {
     return (

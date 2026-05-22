@@ -8,6 +8,7 @@ import {
 import useStore from '../store/useStore'
 import EditProfileModal from '../components/ui/EditProfileModal'
 import InstagramTokenModal from '../components/ui/InstagramTokenModal'
+import ThemeModal from '../components/ui/ThemeModal'
 import { getInstagramOAuthUrl, IG_APP_ID } from '../lib/instagram'
 
 function Row({ icon: Icon, label, sub, onClick, danger, right }) {
@@ -42,10 +43,11 @@ function Section({ title, children }) {
 export default function Account() {
   const navigate      = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { currentUser, userProfile, signOut, instagramAccount, disconnectInstagram, syncInstagramData, igLoading } = useStore()
+  const { currentUser, userProfile, signOut, instagramAccount, disconnectInstagram, syncInstagramData, igLoading, theme } = useStore()
 
   const [editOpen,     setEditOpen]     = useState(false)
   const [tokenOpen,    setTokenOpen]    = useState(false)
+  const [themeOpen,    setThemeOpen]    = useState(false)
   const [igToast,      setIgToast]      = useState('')   // 'connected' | 'error' | ''
   const [disconnecting, setDisconnecting] = useState(false)
 
@@ -103,6 +105,7 @@ export default function Account() {
     <>
       <EditProfileModal     open={editOpen}  onClose={() => setEditOpen(false)} />
       <InstagramTokenModal  open={tokenOpen} onClose={() => setTokenOpen(false)} />
+      <ThemeModal           open={themeOpen} onClose={() => setThemeOpen(false)} />
 
       {/* ── Toast notifications ─────────────────────────────────────── */}
       {igToast === 'connected' && (
@@ -281,7 +284,9 @@ export default function Account() {
 
         {/* ── Preferences ─────────────────────────────────────── */}
         <Section title="Preferences">
-          <Row icon={Moon}   label="Appearance"  sub="Light mode" onClick={() => {}} />
+          <Row icon={Moon}   label="Appearance"
+            sub={theme === 'dark' ? 'Dark mode' : theme === 'system' ? 'Auto · System' : 'Light mode'}
+            onClick={() => setThemeOpen(true)} />
           <Row icon={Shield} label="Privacy"     sub="Data & security" onClick={() => {}} />
         </Section>
 
