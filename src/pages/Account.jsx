@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import useStore from '../store/useStore'
 import EditProfileModal from '../components/ui/EditProfileModal'
+import InstagramTokenModal from '../components/ui/InstagramTokenModal'
 import { getInstagramOAuthUrl, IG_APP_ID } from '../lib/instagram'
 
 function Row({ icon: Icon, label, sub, onClick, danger, right }) {
@@ -44,6 +45,7 @@ export default function Account() {
   const { currentUser, userProfile, signOut, instagramAccount, disconnectInstagram, syncInstagramData, igLoading } = useStore()
 
   const [editOpen,     setEditOpen]     = useState(false)
+  const [tokenOpen,    setTokenOpen]    = useState(false)
   const [igToast,      setIgToast]      = useState('')   // 'connected' | 'error' | ''
   const [disconnecting, setDisconnecting] = useState(false)
 
@@ -99,7 +101,8 @@ export default function Account() {
 
   return (
     <>
-      <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} />
+      <EditProfileModal     open={editOpen}  onClose={() => setEditOpen(false)} />
+      <InstagramTokenModal  open={tokenOpen} onClose={() => setTokenOpen(false)} />
 
       {/* ── Toast notifications ─────────────────────────────────────── */}
       {igToast === 'connected' && (
@@ -218,21 +221,36 @@ export default function Account() {
               </div>
             </div>
           ) : (
-            <button onClick={handleConnectInstagram}
-              className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-ivory-50 active:bg-ivory-100 transition-colors">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045]
-                flex items-center justify-center flex-shrink-0">
-                <Instagram size={15} className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-[13px] font-semibold text-ink-800 leading-none">Instagram</p>
-                <p className="text-[11px] text-ink-400 mt-0.5">Tap to connect your account</p>
-              </div>
-              <span className="text-[11px] font-bold text-white bg-gradient-to-r from-[#833ab4] to-[#fd1d1d]
-                px-3 py-1.5 rounded-full shadow-sm">
-                Connect
-              </span>
-            </button>
+            <>
+              <button onClick={handleConnectInstagram}
+                className="w-full flex items-center gap-3.5 px-4 py-3.5 hover:bg-ivory-50 active:bg-ivory-100 transition-colors">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#833ab4] via-[#fd1d1d] to-[#fcb045]
+                  flex items-center justify-center flex-shrink-0">
+                  <Instagram size={15} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[13px] font-semibold text-ink-800 leading-none">Instagram</p>
+                  <p className="text-[11px] text-ink-400 mt-0.5">Login via OAuth (app review required)</p>
+                </div>
+                <span className="text-[11px] font-bold text-white bg-gradient-to-r from-[#833ab4] to-[#fd1d1d]
+                  px-3 py-1.5 rounded-full shadow-sm">
+                  Connect
+                </span>
+              </button>
+
+              {/* Manual token option */}
+              <button onClick={() => setTokenOpen(true)}
+                className="w-full flex items-center gap-3.5 px-4 py-3 hover:bg-ivory-50 active:bg-ivory-100 transition-colors">
+                <div className="w-8 h-8 rounded-xl bg-ivory-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[14px]">🔑</span>
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[12px] font-semibold text-ink-700 leading-none">Connect with Token</p>
+                  <p className="text-[10px] text-ink-400 mt-0.5">For testers / no review needed</p>
+                </div>
+                <ChevronRight size={14} className="text-ink-300" />
+              </button>
+            </>
           )}
 
           {/* Pinterest — coming soon */}
